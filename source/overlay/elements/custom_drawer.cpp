@@ -19,7 +19,7 @@
 
 #include "overlay/elements/custom_drawer.hpp"
 
-namespace edz::ovl::element {
+namespace tsl::ovl::element {
 
     CustomDrawer::CustomDrawer(u16 x, u16 y, u16 w, u16 h, std::function<void(u16 x, u16 y, ovl::Screen *screen)> drawer) : m_drawer(drawer) {
         this->setPosition(x, y);

@@ -23,7 +23,7 @@
 
 #include <functional>
 
-namespace edz::ovl::element {
+namespace tsl::ovl::element {
 
     class CustomDrawer : public Element {
     public:

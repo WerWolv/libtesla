@@ -28,12 +28,12 @@
 #include "overlay/screen.hpp"
 #include "overlay/elements/element.hpp"
 
-namespace edz::ovl::gui {
+namespace tsl::ovl::gui {
 
     using namespace std::literals::chrono_literals;
     
     using Element = element::Element;
-    static auto &a = edz::ovl::Screen::a;
+    static auto &a = tsl::ovl::Screen::a;
 
     class Gui {
     public:

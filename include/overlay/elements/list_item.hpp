@@ -24,7 +24,7 @@
 #include <string>
 #include <functional>
 
-namespace edz::ovl::element {
+namespace tsl::ovl::element {
 
     class ListItem : public Element {
     public:

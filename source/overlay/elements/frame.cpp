@@ -21,7 +21,7 @@
 
 #include "overlay/gui/gui.hpp"
 
-namespace edz::ovl::element {
+namespace tsl::ovl::element {
 
     Frame::Frame() {
 

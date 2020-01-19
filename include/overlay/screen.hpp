@@ -30,7 +30,7 @@
 #include "overlay/color.hpp"
 #include "overlay/stb_truetype.h"
 
-namespace edz::ovl {
+namespace tsl::ovl {
     
     class Screen {
     public:

@@ -23,7 +23,7 @@
 
 #include <atomic>
 
-namespace edz::ovl::gui {
+namespace tsl::ovl::gui {
 
     Gui::Gui() {
         Gui::s_screen->clear();

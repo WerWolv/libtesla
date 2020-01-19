@@ -27,7 +27,7 @@
 
 enum class FocusDirection { NONE, UP, DOWN, LEFT, RIGHT };
 
-namespace edz::ovl::element {
+namespace tsl::ovl::element {
     
     using namespace std::literals::chrono_literals;
 

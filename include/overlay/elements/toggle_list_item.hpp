@@ -25,7 +25,7 @@
 #include <string>
 #include <functional>
 
-namespace edz::ovl::element {
+namespace tsl::ovl::element {
 
     class ToggleListItem : public ListItem {
     public:

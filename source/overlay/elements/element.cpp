@@ -23,7 +23,7 @@
 #include "overlay/elements/element.hpp"
 #include "overlay/gui/gui.hpp"
 
-namespace edz::ovl::element {
+namespace tsl::ovl::element {
     
     void Element::frame(ovl::Screen *screen) {
         if (gui::Gui::isFocused(this))

@@ -19,7 +19,7 @@
 
 #include "overlay/elements/toggle_list_item.hpp"
 
-namespace edz::ovl::element {
+namespace tsl::ovl::element {
 
     ToggleListItem::ToggleListItem(std::string text, bool defaultState) : ListItem(text), m_state(defaultState) {
 

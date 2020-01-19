@@ -19,7 +19,7 @@
 
 #include "overlay/elements/list_item.hpp"
 
-namespace edz::ovl::element {
+namespace tsl::ovl::element {
 
     ListItem::ListItem(std::string text) : m_text(text) {
 
