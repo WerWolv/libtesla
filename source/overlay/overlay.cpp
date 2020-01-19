@@ -70,10 +70,12 @@ int main(int argc, char** argv) {
     overlay->onOverlayShow(gui);
 
     while (true) {
+        gui->preDraw(screen);
+
         tsl::Gui::tick();
         gui = tsl::Gui::getCurrentGui();
 
-        gui->draw(screen);
+        gui->postDraw(screen);
 
         if (gui->shouldClose())
             break;

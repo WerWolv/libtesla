@@ -75,11 +75,6 @@ namespace tsl {
 
         Gui::s_currGui->update();
 
-        Gui::s_screen->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
-        Gui::s_screen->drawRect(15, 720 - 73, FB_WIDTH - 30, 1, a(0xFFFF));
-
-        Gui::s_screen->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
-
         if (Gui::s_topElement != nullptr)
             Gui::s_topElement->frame(Gui::s_screen);
 

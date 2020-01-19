@@ -47,7 +47,14 @@ namespace tsl {
 
         virtual Element* createUI() = 0;
         virtual void update() {}
-        virtual void draw(Screen *screen) {} 
+        
+        virtual void preDraw(Screen *screen) {
+            screen->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
+            screen->drawRect(15, 720 - 73, FB_WIDTH - 30, 1, a(0xFFFF));
+            screen->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
+        } 
+
+        virtual void postDraw(Screen *screen) {} 
 
         static void tick();
         static void hidUpdate(s64 keysDown, s64 keysHeld, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight, u32 touchX, u32 touchY);
