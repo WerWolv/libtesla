@@ -23,22 +23,22 @@
 
 #include <functional>
 
-namespace tsl::ovl::element {
+namespace tsl::element {
 
     class CustomDrawer : public Element {
     public:
-        CustomDrawer(u16 x, u16 y, u16 w, u16 h, std::function<void(u16 x, u16 y, ovl::Screen *screen)> drawer);
+        CustomDrawer(u16 x, u16 y, u16 w, u16 h, std::function<void(u16 x, u16 y, Screen *screen)> drawer);
         ~CustomDrawer();
 
         Element* requestFocus(Element *oldFocus, FocusDirection direction) {
             return nullptr;
         }
 
-        void draw(ovl::Screen *screen, u16 x, u16 y) override;
+        void draw(Screen *screen, u16 x, u16 y) override;
         void layout() override;
 
     private:
-        std::function<void(u16 x, u16 y, ovl::Screen *screen)> m_drawer;
+        std::function<void(u16 x, u16 y, Screen *screen)> m_drawer;
     };
 
 }

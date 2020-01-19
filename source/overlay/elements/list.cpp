@@ -22,7 +22,7 @@
 
 #include <algorithm>
 
-namespace tsl::ovl::element {
+namespace tsl::element {
 
     List::List() {
 
@@ -78,7 +78,7 @@ namespace tsl::ovl::element {
         return *it;
     }
 
-    void List::draw(ovl::Screen *screen, u16 x, u16 y) {
+    void List::draw(Screen *screen, u16 x, u16 y) {
         u16 i = 0;
         for (auto &item : this->m_items) {
             i++;

@@ -21,7 +21,7 @@
 
 #include "overlay/gui/gui.hpp"
 
-namespace tsl::ovl::element {
+namespace tsl::element {
 
     Frame::Frame() {
 
@@ -43,7 +43,7 @@ namespace tsl::ovl::element {
         return nullptr;
     }
 
-    void Frame::draw(ovl::Screen *screen, u16 x1, u16 y1) {
+    void Frame::draw(Screen *screen, u16 x1, u16 y1) {
         for (auto &child : this->m_children)
             child->frame(screen);
     }

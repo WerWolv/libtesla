@@ -24,7 +24,7 @@
 #include <utility>
 #include <type_traits>
 
-namespace tsl::ovl {
+namespace tsl {
 
     struct rgb565_t {
         union {

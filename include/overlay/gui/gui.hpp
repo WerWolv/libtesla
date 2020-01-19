@@ -28,12 +28,12 @@
 #include "overlay/screen.hpp"
 #include "overlay/elements/element.hpp"
 
-namespace tsl::ovl::gui {
+namespace tsl {
 
     using namespace std::literals::chrono_literals;
     
     using Element = element::Element;
-    static auto &a = tsl::ovl::Screen::a;
+    static auto &a = tsl::Screen::a;
 
     class Gui {
     public:
@@ -46,7 +46,8 @@ namespace tsl::ovl::gui {
         virtual bool shouldClose();
 
         virtual Element* createUI() = 0;
-        virtual void update() = 0;
+        virtual void update() {}
+        virtual void draw(Screen *screen) {} 
 
         static void tick();
         static void hidUpdate(s64 keysDown, s64 keysHeld, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight, u32 touchX, u32 touchY);
@@ -57,6 +58,10 @@ namespace tsl::ovl::gui {
         template<typename T>
         static Gui* changeTo() { 
             return Gui::s_nextGui = new T();
+        }
+
+        static void changeTo(Gui *gui) {
+            Gui::s_nextGui = gui;
         }
 
         static Gui* getCurrentGui() { return Gui::s_currGui; }
@@ -77,6 +82,10 @@ namespace tsl::ovl::gui {
 
         static auto getLastFrameTime() {
             return std::chrono::duration_cast<std::chrono::duration<u64, std::milli>>(Gui::s_lastFrameDuration);
+        }
+
+        static void setOpacity(float opacity) {
+            Gui::s_screen->setOpacity(opacity);
         }
 
     private:

@@ -36,7 +36,7 @@
 
 extern "C" u64 __nx_vi_layer_id;
 
-namespace tsl::ovl {
+namespace tsl {
 
     Result Screen::initialize() {  
         Result res;

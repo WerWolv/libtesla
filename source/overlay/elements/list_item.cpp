@@ -19,7 +19,7 @@
 
 #include "overlay/elements/list_item.hpp"
 
-namespace tsl::ovl::element {
+namespace tsl::element {
 
     ListItem::ListItem(std::string text) : m_text(text) {
 
@@ -34,7 +34,7 @@ namespace tsl::ovl::element {
         return this;
     }
 
-    void ListItem::draw(ovl::Screen *screen, u16 x1, u16 y1) {
+    void ListItem::draw(Screen *screen, u16 x1, u16 y1) {
         const auto [x, y] = this->getPosition();
         const auto [w, h] = this->getSize();
 

@@ -17,8 +17,21 @@
  * along with libtesla.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "overlay/gui/gui.hpp"
+
 namespace tsl {
 
-    bool mainLoop();
+    class Overlay {
+    public:
+        Overlay() { }
+        virtual ~Overlay() { }
+
+        virtual Gui* onSetup() { return nullptr; }
+        virtual void onOverlayShow(Gui *gui) { gui->setOpacity(1.0F); }
+        virtual void onOverlayHide(Gui *gui) { }
+
+        virtual void onDraw(tsl::Screen *screen) { }
+        
+    };
 
 }

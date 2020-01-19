@@ -30,7 +30,7 @@
 #include "overlay/color.hpp"
 #include "overlay/stb_truetype.h"
 
-namespace tsl::ovl {
+namespace tsl {
     
     class Screen {
     public:
@@ -179,7 +179,7 @@ namespace tsl::ovl {
         static inline PlFontData s_fontStd, s_fontExt;
         static inline stbtt_fontinfo s_stbFontStd, s_stbFontExt, s_stbFontMaterial;
 
-        static inline float s_opacity;
+        static inline float s_opacity = 0.0F;
         static inline bool s_scissoringEnabled;
         static inline u16 s_scissorBounds[4];
 

@@ -19,9 +19,9 @@
 
 #include "overlay/elements/custom_drawer.hpp"
 
-namespace tsl::ovl::element {
+namespace tsl::element {
 
-    CustomDrawer::CustomDrawer(u16 x, u16 y, u16 w, u16 h, std::function<void(u16 x, u16 y, ovl::Screen *screen)> drawer) : m_drawer(drawer) {
+    CustomDrawer::CustomDrawer(u16 x, u16 y, u16 w, u16 h, std::function<void(u16 x, u16 y, Screen *screen)> drawer) : m_drawer(drawer) {
         this->setPosition(x, y);
         this->setSize(w, h);
     }
@@ -30,7 +30,7 @@ namespace tsl::ovl::element {
 
     }
 
-    void CustomDrawer::draw(ovl::Screen *screen, u16 x1, u16 y1) {
+    void CustomDrawer::draw(Screen *screen, u16 x1, u16 y1) {
         const auto [x, y] = this->getPosition();
 
         if (this->m_drawer != nullptr)

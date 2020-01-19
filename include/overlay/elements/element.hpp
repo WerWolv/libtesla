@@ -27,7 +27,7 @@
 
 enum class FocusDirection { NONE, UP, DOWN, LEFT, RIGHT };
 
-namespace tsl::ovl::element {
+namespace tsl::element {
     
     using namespace std::literals::chrono_literals;
 
@@ -48,12 +48,12 @@ namespace tsl::ovl::element {
 
         void shakeFocus(FocusDirection direction);
 
-        virtual void draw(ovl::Screen *screen, u16 x, u16 y) = 0;
+        virtual void draw(Screen *screen, u16 x, u16 y) = 0;
         virtual void layout() = 0;
 
-        void frame(ovl::Screen *screen);
+        void frame(Screen *screen);
 
-        virtual void drawFocus(ovl::Screen *screen);
+        virtual void drawFocus(Screen *screen);
 
         void setParent(Element *parent) { this->m_parent = parent; }
         Element* getParent() { return this->m_parent; }
@@ -71,7 +71,7 @@ namespace tsl::ovl::element {
         virtual void applyOpacity(float opacity) { }
 
         rgba4444_t a(const rgba4444_t &c) {
-            return ovl::Screen::a((c.rgba & 0x0FFF) | (static_cast<u8>(c.a * Element::m_opacity) << 12));
+            return Screen::a((c.rgba & 0x0FFF) | (static_cast<u8>(c.a * Element::m_opacity) << 12));
         }
 
     private:

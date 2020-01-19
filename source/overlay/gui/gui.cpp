@@ -23,7 +23,7 @@
 
 #include <atomic>
 
-namespace tsl::ovl::gui {
+namespace tsl {
 
     Gui::Gui() {
         Gui::s_screen->clear();

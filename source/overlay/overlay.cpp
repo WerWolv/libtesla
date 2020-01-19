@@ -22,12 +22,16 @@
 #include "overlay/screen.hpp"
 #include "overlay/gui/gui.hpp"
 
+#include "overlay/overlay.hpp"
+
+extern tsl::Overlay* overlayLoad();
+
 extern "C" {
 
     u32 __nx_applet_type = AppletType_None;
     u32 __nx_nv_transfermem_size = 0x15000;
 
-    static tsl::ovl::Screen *screen;
+    static tsl::Screen *screen;
 
     void __appInit(void) {
         smInitialize();
@@ -37,12 +41,12 @@ extern "C" {
         plInitialize();
         fsdevMountSdmc();
 
-        tsl::ovl::Screen::initialize();
+        tsl::Screen::initialize();
 
         smExit();
 
-        screen = new tsl::ovl::Screen();
-        tsl::ovl::gui::Gui::init(screen);
+        screen = new tsl::Screen();
+        tsl::Gui::init(screen);
     }
 
     void __appExit(void) {
@@ -50,24 +54,37 @@ extern "C" {
         hidExit();
         plExit();
 
-        tsl::ovl::Screen::exit();
+        tsl::Screen::exit();
 
         delete screen;
     } 
 
 }
 
-namespace tsl {
+int main(int argc, char** argv) {
+    tsl::Gui::playIntroAnimation();
+    tsl::Overlay *overlay = overlayLoad();
 
-    bool mainLoop() {
-        tsl::ovl::gui::Gui::tick();
+    tsl::Gui::changeTo(overlay->onSetup());
+    overlay->onOverlayShow();
 
-        if (tsl::ovl::gui::Gui::getCurrentGui()->shouldClose())
-            return false;
+    while (true) {
+        tsl::Gui::tick();
+        tsl::Gui *gui = tsl::Gui::getCurrentGui();
 
-        tsl::ovl::Screen::waitForVsync();
+        gui->draw(screen);
 
-        return true;
+        if (gui->shouldClose())
+            break;
+
+        tsl::Screen::waitForVsync();
     }
 
+    tsl::Gui::exit();
+
+    overlay->onOverlayHide();
+
+    delete overlay;
+
+    envSetNextLoad("sdmc:/switch/.overlays/tesla.ovl", *argv);
 }

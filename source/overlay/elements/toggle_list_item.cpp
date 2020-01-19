@@ -19,7 +19,7 @@
 
 #include "overlay/elements/toggle_list_item.hpp"
 
-namespace tsl::ovl::element {
+namespace tsl::element {
 
     ToggleListItem::ToggleListItem(std::string text, bool defaultState) : ListItem(text), m_state(defaultState) {
 
@@ -34,7 +34,7 @@ namespace tsl::ovl::element {
         return ListItem::requestFocus(oldFocus, direction);
     }
 
-    void ToggleListItem::draw(ovl::Screen *screen, u16 x1, u16 y1) {
+    void ToggleListItem::draw(Screen *screen, u16 x1, u16 y1) {
         const auto [x, y] = this->getPosition();
         const auto [w, h] = this->getSize();
 

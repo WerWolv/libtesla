@@ -24,7 +24,7 @@
 #include <string>
 #include <functional>
 
-namespace tsl::ovl::element {
+namespace tsl::element {
 
     class ListItem : public Element {
     public:
@@ -33,7 +33,7 @@ namespace tsl::ovl::element {
 
         Element* requestFocus(Element *oldFocus, FocusDirection direction) override;
 
-        void draw(ovl::Screen *screen, u16 x, u16 y) override;
+        void draw(Screen *screen, u16 x, u16 y) override;
         void layout() override;
 
         bool onClick(s64 key) override;

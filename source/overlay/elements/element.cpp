@@ -23,10 +23,10 @@
 #include "overlay/elements/element.hpp"
 #include "overlay/gui/gui.hpp"
 
-namespace tsl::ovl::element {
+namespace tsl::element {
     
-    void Element::frame(ovl::Screen *screen) {
-        if (gui::Gui::isFocused(this))
+    void Element::frame(Screen *screen) {
+        if (Gui::isFocused(this))
             this->drawFocus(screen);
 
         this->draw(screen, this->m_x, this->m_y);
@@ -41,7 +41,7 @@ namespace tsl::ovl::element {
         return roundf(a * exp(-(tau * t_) * sin(w * t_)));
     }
 
-    void Element::drawFocus(ovl::Screen *screen) {
+    void Element::drawFocus(Screen *screen) {
         static float counter = 0;
         const float progress = (std::sin(counter) + 1) / 2;
         rgba4444_t highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
