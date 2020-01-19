@@ -64,13 +64,14 @@ extern "C" {
 int main(int argc, char** argv) {
     tsl::Gui::playIntroAnimation();
     tsl::Overlay *overlay = overlayLoad();
+    tsl::Gui *gui = overlay->onSetup();
 
-    tsl::Gui::changeTo(overlay->onSetup());
-    overlay->onOverlayShow();
+    tsl::Gui::changeTo(gui);
+    overlay->onOverlayShow(gui);
 
     while (true) {
         tsl::Gui::tick();
-        tsl::Gui *gui = tsl::Gui::getCurrentGui();
+        gui = tsl::Gui::getCurrentGui();
 
         gui->draw(screen);
 
@@ -82,7 +83,7 @@ int main(int argc, char** argv) {
 
     tsl::Gui::exit();
 
-    overlay->onOverlayHide();
+    overlay->onOverlayHide(gui);
 
     delete overlay;
 
