@@ -85,7 +85,7 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 .PHONY: clean all
 
 #---------------------------------------------------------------------------------
-all: lib/lib$(TARGET).a lib/lib$(TARGET)d.a
+all: lib/$(TARGET).a lib/$(TARGET)d.a
 
 lib:
 	@[ -d $@ ] || mkdir -p $@
@@ -96,14 +96,14 @@ release:
 debug:
 	@[ -d $@ ] || mkdir -p $@
 
-lib/lib$(TARGET).a : lib release $(SOURCES) $(INCLUDES)
+lib/$(TARGET).a : lib release $(SOURCES) $(INCLUDES)
 	@$(MAKE) BUILD=release OUTPUT=$(CURDIR)/$@ \
 	BUILD_CFLAGS="-DNDEBUG=1 -O2" \
 	DEPSDIR=$(CURDIR)/release \
 	--no-print-directory -C release \
 	-f $(CURDIR)/Makefile
 
-lib/lib$(TARGET)d.a : lib debug $(SOURCES) $(INCLUDES)
+lib/$(TARGET)d.a : lib debug $(SOURCES) $(INCLUDES)
 	@$(MAKE) BUILD=debug OUTPUT=$(CURDIR)/$@ \
 	BUILD_CFLAGS="-DDEBUG=1 -Og" \
 	DEPSDIR=$(CURDIR)/debug \
@@ -111,10 +111,10 @@ lib/lib$(TARGET)d.a : lib debug $(SOURCES) $(INCLUDES)
 	-f $(CURDIR)/Makefile
 
 dist-bin: all
-	@tar --exclude=*~ -cjf lib$(TARGET).tar.bz2 include lib
+	@tar --exclude=*~ -cjf $(TARGET).tar.bz2 include lib
 
 dist-src:
-	@tar --exclude=*~ -cjf lib$(TARGET)-src.tar.bz2 include source Makefile
+	@tar --exclude=*~ -cjf $(TARGET)-src.tar.bz2 include source Makefile
 
 dist: dist-src dist-bin
 
