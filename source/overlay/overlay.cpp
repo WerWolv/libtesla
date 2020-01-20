@@ -80,7 +80,8 @@ struct SharedThreadData {
     std::atomic<JoystickPosition> joyStickPosRight;
     std::atomic<u32> touchX, touchY;
 
-    bool overlayOpen;
+    std::atomic<bool> overlayOpen;
+
 };
 
 
@@ -167,6 +168,14 @@ int main(int argc, char** argv) {
     Thread hidThread;
     static SharedThreadData shData = { 0 };
 
+    bool skipCombo = false;
+    u32 selectedMainMenuIndex = 0;
+
+    for (u8 i = 0; i < argc; i++) {
+        if (std::string(argv[i]) == "--initial-load")
+            skipCombo = true;
+    } 
+
     shData.running = true;
     shData.overlayOpen = false;
 
@@ -178,15 +187,20 @@ int main(int argc, char** argv) {
     tsl::Overlay::setCurrentOverlay(overlayLoad());
 
     while (shData.running) {
-        eventWait(&shData.overlayComboEvent, U64_MAX);
-        eventClear(&shData.overlayComboEvent);
+        tsl::Gui *gui = tsl::Overlay::getCurrentOverlay()->onSetup();
+        tsl::Gui::changeTo(gui);
+
+        if (!skipCombo) {
+            eventWait(&shData.overlayComboEvent, U64_MAX);
+            eventClear(&shData.overlayComboEvent);
+            tsl::Overlay::getCurrentOverlay()->onOverlayShow(gui);
+        } else {
+            tsl::Overlay::getCurrentOverlay()->onOverlayLoad(gui);
+            skipCombo = false;
+        }
 
         focusOverlay(true);
         shData.overlayOpen = true;
-
-        tsl::Gui *gui = tsl::Overlay::getCurrentOverlay()->onSetup();
-        tsl::Gui::changeTo(gui);
-        tsl::Overlay::getCurrentOverlay()->onOverlayShow(gui);
 
         while (true) {
             gui->preDraw(screen);
@@ -226,7 +240,7 @@ int main(int argc, char** argv) {
 
     eventClose(&shData.overlayComboEvent);
 
-    envSetNextLoad(tsl::Overlay::getNextLoadPath().c_str(), "");
+    envSetNextLoad(tsl::Overlay::getNextLoadPath().c_str(), "--initial-load");
 
     delete tsl::Overlay::getCurrentOverlay();
 }

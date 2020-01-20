@@ -27,8 +27,9 @@ namespace tsl {
         virtual ~Overlay() { }
 
         virtual Gui* onSetup() { return nullptr; }
-        virtual void onOverlayShow(Gui *gui) { gui->setOpacity(1.0F); }
-        virtual void onOverlayHide(Gui *gui) { gui->setOpacity(0.0F); Gui::hideGui(); }
+        virtual void onOverlayLoad(Gui *gui) { gui->setOpacity(1.0F); }
+        virtual void onOverlayShow(Gui *gui) { tsl::Gui::playIntroAnimation(); }
+        virtual void onOverlayHide(Gui *gui) { tsl::Gui::playOutroAnimation(); }
         virtual void onOverlayExit(Gui *gui) { gui->setOpacity(0.0F); Gui::closeGui(); }
 
         virtual void onDraw(tsl::Screen *screen) { }
