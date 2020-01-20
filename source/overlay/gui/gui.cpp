@@ -28,11 +28,7 @@ namespace tsl {
     Gui::Gui() {
         Gui::s_screen->clear();
         
-        Gui::s_introAnimationPlaying = false;
-        Gui::s_outroAnimationPlaying = false;
-        Gui::s_animationCounter = 0;
-        Gui::s_shouldHide = false;
-        Gui::s_shouldClose = false;
+        Gui::reset();
     }
 
     Gui::~Gui() {
@@ -92,7 +88,7 @@ namespace tsl {
         Gui::s_screen->flush();
 
         if (Gui::s_introAnimationPlaying) {
-            if (Gui::s_animationCounter == 6) {
+            if (Gui::s_animationCounter >= 6) {
                 Gui::s_introAnimationPlaying = false;
                 Gui::s_animationCounter = 0;
             } else {
@@ -100,7 +96,7 @@ namespace tsl {
                 Gui::s_animationCounter++;
             }
         } else if (Gui::s_outroAnimationPlaying) {
-            if (Gui::s_animationCounter == 6) {
+            if (Gui::s_animationCounter >= 6) {
                 Gui::s_outroAnimationPlaying = false;
                 Gui::s_animationCounter = 0;
 
@@ -200,6 +196,14 @@ namespace tsl {
             if (Overlay::getCurrentOverlay() != nullptr && Gui::getCurrentGui() != nullptr)
                 Overlay::getCurrentOverlay()->onOverlayExit(Gui::getCurrentGui());
         }
+    }
+
+    void Gui::reset() {
+        Gui::s_introAnimationPlaying = false;
+        Gui::s_outroAnimationPlaying = false;
+        Gui::s_animationCounter = 0;
+        Gui::s_shouldHide = false;
+        Gui::s_shouldClose = false;
     }
 
 }

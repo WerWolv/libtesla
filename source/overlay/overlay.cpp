@@ -169,7 +169,6 @@ int main(int argc, char** argv) {
     static SharedThreadData shData = { 0 };
 
     bool skipCombo = false;
-    u32 selectedMainMenuIndex = 0;
 
     for (u8 i = 0; i < argc; i++) {
         if (std::string(argv[i]) == "--initial-load")
@@ -214,10 +213,13 @@ int main(int argc, char** argv) {
 
             gui->postDraw(screen);
 
-            if (gui->shouldHide())
+            if (gui->shouldHide()) {
+                tsl::Gui::reset();
                 break;
+            }
 
             if (gui->shouldClose()) {
+                tsl::Gui::reset();
                 shData.running = false;
                 break;
             }
@@ -231,6 +233,7 @@ int main(int argc, char** argv) {
         focusOverlay(false);
         eventClear(&shData.overlayComboEvent);
         shData.inputMutex.unlock();
+
     }
     
     tsl::Gui::exit();

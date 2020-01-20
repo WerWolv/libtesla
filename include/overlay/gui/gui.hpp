@@ -100,6 +100,8 @@ namespace tsl {
             Gui::s_screen->setOpacity(opacity);
         }
 
+        static void reset();
+
     private:
         static inline Screen *s_screen = nullptr;
         static inline Gui *s_currGui = nullptr;
