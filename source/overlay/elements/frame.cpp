@@ -63,8 +63,7 @@ namespace tsl::element {
 
     bool Frame::onClick(s64 key) {
         if (key == KEY_B) {     
-            if (Overlay::getCurrentOverlay() != nullptr && Gui::getCurrentGui() != nullptr)
-                Overlay::getCurrentOverlay()->onOverlayExit(Gui::getCurrentGui());
+            Gui::goBack();
             return true;
         }
 

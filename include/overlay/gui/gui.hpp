@@ -68,10 +68,14 @@ namespace tsl {
             return Gui::changeTo(new T());
         }
 
-        static void changeTo(Gui *gui) {
+        static Gui* changeTo(Gui *gui) {
             Gui::s_shouldHide = false;
             Gui::s_nextGui = gui;
+
+            return gui;
         }
+
+        static void goBack();
 
         static Gui* getCurrentGui() { return Gui::s_currGui; }
 
@@ -112,6 +116,7 @@ namespace tsl {
 
         static inline std::chrono::duration<s64, std::nano> s_lastFrameDuration = 0s;
 
+        static inline std::vector<Gui*> s_previousGuis;
     };
 
 }

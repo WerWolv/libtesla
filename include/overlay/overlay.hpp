@@ -31,6 +31,7 @@ namespace tsl {
         virtual void onOverlayShow(Gui *gui) { tsl::Gui::playIntroAnimation(); }
         virtual void onOverlayHide(Gui *gui) { tsl::Gui::playOutroAnimation(); }
         virtual void onOverlayExit(Gui *gui) { gui->setOpacity(0.0F); Gui::closeGui(); }
+        virtual void onDestroy() { }
 
         virtual void onDraw(tsl::Screen *screen) { }
 

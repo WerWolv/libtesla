@@ -186,9 +186,9 @@ int main(int argc, char** argv) {
 
     tsl::Overlay::setCurrentOverlay(overlayLoad());
 
+    tsl::Gui *gui = tsl::Overlay::getCurrentOverlay()->onSetup();
+    tsl::Gui::changeTo(gui);
     while (shData.running) {
-        tsl::Gui *gui = tsl::Overlay::getCurrentOverlay()->onSetup();
-        tsl::Gui::changeTo(gui);
 
         if (!skipCombo) {
             eventWait(&shData.overlayComboEvent, U64_MAX);
@@ -231,10 +231,12 @@ int main(int argc, char** argv) {
         focusOverlay(false);
         eventClear(&shData.overlayComboEvent);
         shData.inputMutex.unlock();
-        tsl::Gui::exit();
-        delete gui;
     }
+    
+    tsl::Gui::exit();
+    delete gui;
 
+    tsl::Overlay::getCurrentOverlay()->onDestroy();
     threadWaitForExit(&hidThread);
     threadClose(&hidThread);
 

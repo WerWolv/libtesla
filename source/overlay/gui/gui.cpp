@@ -68,7 +68,7 @@ namespace tsl {
             Gui::removeFocus();
 
             if (Gui::s_currGui != nullptr)
-                delete Gui::s_currGui;
+                Gui::s_previousGuis.push_back(Gui::s_currGui);
 
             if (Gui::s_topElement != nullptr)
                 delete Gui::s_topElement;
@@ -184,6 +184,22 @@ namespace tsl {
     void Gui::removeFocus(Element *element) {
         if (element == Gui::s_focusedElement || element == nullptr)
             Gui::s_focusedElement = nullptr;
+    }
+
+    void Gui::goBack() {
+        Gui::s_shouldHide = false;
+
+        if (Gui::s_previousGuis.size() > 0) {
+            Gui::s_nextGui = Gui::s_previousGuis.back();
+            Gui::s_previousGuis.pop_back();
+
+            delete Gui::s_currGui;
+            Gui::s_currGui = nullptr;
+        }
+        else {
+            if (Overlay::getCurrentOverlay() != nullptr && Gui::getCurrentGui() != nullptr)
+                Overlay::getCurrentOverlay()->onOverlayExit(Gui::getCurrentGui());
+        }
     }
 
 }
