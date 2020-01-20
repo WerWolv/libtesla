@@ -58,57 +58,58 @@ namespace tsl {
     }
 
     Screen::Screen() {
+        Result res = 0;
+        u64 layerId = 0;
+        s32 layerZ = 0;
+        
         smInitialize();
-        {
-            Result res = 0;
-            u64 layerId = 0;
-            s32 layerZ = 0;
 
-            if (R_FAILED(res = viCreateManagedLayer(&Screen::s_display, (ViLayerFlags)0, 0, &__nx_vi_layer_id)))
-                goto fatal;
+        if (R_FAILED(res = viCreateManagedLayer(&Screen::s_display, (ViLayerFlags)0, 0, &__nx_vi_layer_id)))
+            goto fatal;
 
-            if (R_FAILED(res = viCreateLayer(&Screen::s_display, &this->m_layer)))
-                goto closeManagedLayer;
+        if (R_FAILED(res = viCreateLayer(&Screen::s_display, &this->m_layer)))
+            goto closeManagedLayer;
 
-            if (R_FAILED(res = viSetLayerScalingMode(&this->m_layer, ViScalingMode_PreserveAspectRatio)))
+        if (R_FAILED(res = viSetLayerScalingMode(&this->m_layer, ViScalingMode_PreserveAspectRatio)))
+            goto closeLayer;
+
+        if (R_SUCCEEDED(res = viGetZOrderCountMax(&Screen::s_display, &layerZ)) && (layerZ > 0))
+            if (R_FAILED(res = viSetLayerZ(&this->m_layer, layerZ)))
                 goto closeLayer;
 
-            if (R_SUCCEEDED(res = viGetZOrderCountMax(&Screen::s_display, &layerZ)) && (layerZ > 0))
-                if (R_FAILED(res = viSetLayerZ(&this->m_layer, layerZ)))
-                    goto closeLayer;
+        if (R_FAILED(res = viSetLayerSize(&this->m_layer, LAYER_WIDTH, LAYER_HEIGHT)))
+            goto closeLayer;
 
-            if (R_FAILED(res = viSetLayerSize(&this->m_layer, LAYER_WIDTH, LAYER_HEIGHT)))
-                goto closeLayer;
+        if (R_FAILED(res = viSetLayerPosition(&this->m_layer, LAYER_X, LAYER_Y)))
+            goto closeLayer;
 
-            if (R_FAILED(res = viSetLayerPosition(&this->m_layer, LAYER_X, LAYER_Y)))
-                goto closeLayer;
+        if (R_FAILED(res = nwindowCreateFromLayer(&this->m_window, &this->m_layer)))
+            goto closeLayer;
 
-            if (R_FAILED(res = nwindowCreateFromLayer(&this->m_window, &this->m_layer)))
-                goto closeLayer;
+        if (R_FAILED(res = framebufferCreate(&this->m_frameBufferObject, &this->m_window, FB_WIDTH, FB_HEIGHT, PIXEL_FORMAT_RGBA_4444, 2)))
+            goto closeWindow;
 
-            if (R_FAILED(res = framebufferCreate(&this->m_frameBufferObject, &this->m_window, FB_WIDTH, FB_HEIGHT, PIXEL_FORMAT_RGBA_4444, 2)))
-                goto closeWindow;
+        if (R_FAILED(initFont()))
+            goto closeWindow;
 
-            if (R_FAILED(initFont()))
-                goto closeWindow;
-
-            return;
-
-            {
-                closeWindow:
-                    nwindowClose(&this->m_window);
-                closeLayer:
-                    layerId = this->m_layer.layer_id;
-                    viCloseLayer(&this->m_layer);
-                closeManagedLayer:
-                    layerId = (layerId == 0) ? this->m_layer.layer_id : layerId;
-                    viDestroyManagedLayer(layerId);
-                fatal:
-                    Screen::exit();
-                    fatalThrow(res);
-            }
-        }
         smExit();
+        return;
+
+        {
+
+            closeWindow:
+                nwindowClose(&this->m_window);
+            closeLayer:
+                layerId = this->m_layer.layer_id;
+                viCloseLayer(&this->m_layer);
+            closeManagedLayer:
+                layerId = (layerId == 0) ? this->m_layer.layer_id : layerId;
+                viDestroyManagedLayer(layerId);
+            fatal:
+                Screen::exit();
+                smExit();
+                fatalThrow(res);
+        }
     }
 
     Screen::~Screen() {

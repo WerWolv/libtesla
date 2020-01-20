@@ -28,10 +28,19 @@ namespace tsl {
 
         virtual Gui* onSetup() { return nullptr; }
         virtual void onOverlayShow(Gui *gui) { gui->setOpacity(1.0F); }
-        virtual void onOverlayHide(Gui *gui) { }
+        virtual void onOverlayHide(Gui *gui) { gui->setOpacity(0.0F); Gui::hideGui(); }
+        virtual void onOverlayExit(Gui *gui) { gui->setOpacity(0.0F); Gui::closeGui(); }
 
         virtual void onDraw(tsl::Screen *screen) { }
-        
+
+        static Overlay *getCurrentOverlay() { return Overlay::s_currentOverlay; }
+        static void setCurrentOverlay(Overlay *overlay) { Overlay::s_currentOverlay = overlay; }
+
+        static void setNextLoadPath(std::string nextLoadPath) { Overlay::s_nextLoadPath = nextLoadPath; }
+        static std::string getNextLoadPath() { return Overlay::s_nextLoadPath; }
+    private:
+        static inline Overlay *s_currentOverlay = nullptr;
+        static inline std::string s_nextLoadPath = "sdmc:/switch/.overlays/ovlmenu.ovl";
     };
 
 }

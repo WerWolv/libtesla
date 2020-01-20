@@ -21,7 +21,7 @@
 
 #include "overlay/gui/gui.hpp"
 
-#include <atomic>
+#include "overlay/overlay.hpp"
 
 namespace tsl {
 
@@ -31,6 +31,8 @@ namespace tsl {
         Gui::s_introAnimationPlaying = false;
         Gui::s_outroAnimationPlaying = false;
         Gui::s_animationCounter = 0;
+        Gui::s_shouldHide = false;
+        Gui::s_shouldClose = false;
     }
 
     Gui::~Gui() {
@@ -42,12 +44,21 @@ namespace tsl {
     }
 
     void Gui::exit() {
-        if (Gui::s_currGui != nullptr)
-            delete Gui::s_currGui;
+        if (Gui::s_currGui == nullptr)
+            return;
+
+        Gui::s_screen->clear();
+        Gui::s_screen->flush();
+
+        Gui::s_currGui = nullptr;
+    }
+
+    bool Gui::shouldHide() {
+        return Gui::s_shouldHide;
     }
 
     bool Gui::shouldClose() {
-        return Gui::s_outroAnimationPlaying && Gui::s_animationCounter == 5;
+        return Gui::s_shouldClose;
     }
 
     void Gui::tick() {
@@ -92,6 +103,8 @@ namespace tsl {
             if (Gui::s_animationCounter == 6) {
                 Gui::s_outroAnimationPlaying = false;
                 Gui::s_animationCounter = 0;
+
+                Gui::hideGui();
             } else {
                 Gui::s_screen->setOpacity(1 - Gui::s_animationCounter * 0.2);
                 Gui::s_animationCounter++;
@@ -105,10 +118,11 @@ namespace tsl {
     }
 
     void Gui::hidUpdate(s64 keysDown, s64 keysHeld, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight, u32 touchX, u32 touchY) {
-        if (touchX > FB_WIDTH)
-            Gui::playOutroAnimation();
-
         Element *activeElement = Gui::s_focusedElement;
+
+        if (touchX > FB_WIDTH)
+            if (Overlay::getCurrentOverlay() != nullptr && Gui::getCurrentGui() != nullptr)
+                Overlay::getCurrentOverlay()->onOverlayHide(Gui::getCurrentGui());
 
         if (Gui::s_focusedElement == nullptr) {
             if (Gui::s_topElement == nullptr)

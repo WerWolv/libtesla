@@ -43,6 +43,7 @@ namespace tsl {
         static void init(Screen *screen);
         static void exit();
 
+        virtual bool shouldHide();
         virtual bool shouldClose();
 
         virtual Element* createUI() = 0;
@@ -64,22 +65,22 @@ namespace tsl {
 
         template<typename T>
         static Gui* changeTo() { 
-            return Gui::s_nextGui = new T();
+            return Gui::changeTo(new T());
         }
 
         static void changeTo(Gui *gui) {
+            Gui::s_shouldHide = false;
             Gui::s_nextGui = gui;
         }
 
         static Gui* getCurrentGui() { return Gui::s_currGui; }
 
+        static void hideGui() {
+            Gui::s_shouldHide = true;
+        }
+
         static void closeGui() {
-            if (Gui::s_currGui == nullptr)
-                return;
-
-
-            delete Gui::s_currGui;
-            Gui::s_currGui = nullptr;
+            Gui::s_shouldClose = true;
         }
 
         static void requestFocus(Element *element, FocusDirection direction);
@@ -105,6 +106,9 @@ namespace tsl {
         static inline u8 s_animationCounter = 0;
         static inline bool s_introAnimationPlaying = true;
         static inline bool s_outroAnimationPlaying = true;
+
+        static inline bool s_shouldHide = false;
+        static inline bool s_shouldClose  = false;
 
         static inline std::chrono::duration<s64, std::nano> s_lastFrameDuration = 0s;
 

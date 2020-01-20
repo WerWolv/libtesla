@@ -20,6 +20,7 @@
 #include "overlay/elements/frame.hpp"
 
 #include "overlay/gui/gui.hpp"
+#include "overlay/overlay.hpp"
 
 namespace tsl::element {
 
@@ -61,7 +62,9 @@ namespace tsl::element {
     }
 
     bool Frame::onClick(s64 key) {
-        if (key == KEY_B) {                
+        if (key == KEY_B) {     
+            if (Overlay::getCurrentOverlay() != nullptr && Gui::getCurrentGui() != nullptr)
+                Overlay::getCurrentOverlay()->onOverlayExit(Gui::getCurrentGui());
             return true;
         }
 
