@@ -1,6 +1,6 @@
 /**
  * Copyright (C) 2019 averne
- * Copyright (C) 2019 WerWolv
+ * Copyright (C) 2020 WerWolv
  * 
  * This file is part of libtesla.
  * 
