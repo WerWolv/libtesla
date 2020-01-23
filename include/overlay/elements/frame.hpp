@@ -38,6 +38,7 @@ namespace tsl::element {
         bool onClick(s64 key) override;
         
         void addElement(Element *element);
+        void clear();
 
     private:
         std::vector<Element*> m_children;

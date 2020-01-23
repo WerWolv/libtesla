@@ -78,6 +78,7 @@ namespace tsl {
         static void goBack();
 
         static Gui* getCurrentGui() { return Gui::s_currGui; }
+        static Element* getTopElement() { return Gui::s_topElement; }
 
         static void hideGui() {
             Gui::s_shouldHide = true;

@@ -79,4 +79,15 @@ namespace tsl::element {
         this->m_children.push_back(element);
     }
 
+    void Frame::clear() {
+        tsl::Gui::removeFocus();
+
+        for (auto &item : this->m_children)
+            delete item;
+
+        this->m_children.clear();
+
+        tsl::Gui::requestFocus(this, FocusDirection::NONE);
+    }
+
 }

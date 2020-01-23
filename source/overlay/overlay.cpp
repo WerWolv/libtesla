@@ -199,6 +199,7 @@ int main(int argc, char** argv) {
         }
 
         focusOverlay(true);
+        tsl::Gui::requestFocus(tsl::Gui::getTopElement(), FocusDirection::NONE);
         shData.overlayOpen = true;
 
         while (true) {
