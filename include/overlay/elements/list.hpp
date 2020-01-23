@@ -38,6 +38,7 @@ namespace tsl::element {
         void applyOpacity(float opacity) override;
 
         void addItem(ListItem *listItem);
+        void clear();
 
     private:
         std::vector<ListItem*> m_items;

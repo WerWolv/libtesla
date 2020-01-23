@@ -122,4 +122,15 @@ namespace tsl::element {
         this->m_items.push_back(listItem);
     }
 
+    void List::clear() {
+        tsl::Gui::removeFocus();
+
+        for (auto &item : this->m_items)
+            delete item;
+
+        this->m_items.clear();
+
+        tsl::Gui::requestFocus(this, FocusDirection::NONE);
+    }
+
 }
