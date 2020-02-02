@@ -61,10 +61,13 @@ namespace tsl::element {
                 return *(it - 1);
             }
         } else if (direction == FocusDirection::DOWN) {
-            if (it == (this->m_items.end() - 1))
-                return this->m_items[this->m_items.size() - 1];
+            if (it == (this->m_items.end() - 1)) {
+                if (this->m_items.size() > 0)
+                    return this->m_items[this->m_items.size() - 1];
+                else return nullptr;
+            }
             else {
-                if (oldFocus == *(this->m_items.begin() + this->m_listOffset + 4)) {
+                if (this->m_items.size() >= this->m_listOffset + 4 && oldFocus == *(this->m_items.begin() + this->m_listOffset + 4)) {
                     if (this->m_listOffset < this->m_items.size()) {
                         this->m_listOffset++;
                         this->layout();
