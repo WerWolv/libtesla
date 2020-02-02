@@ -138,8 +138,21 @@ void hidLoop(void *args) {
         {
             std::scoped_lock lock(shData->inputMutex);
 
-            shData->keysDown         = hidKeysDown(CONTROLLER_HANDHELD);
-            shData->keysHeld         = hidKeysHeld(CONTROLLER_HANDHELD);
+            shData->keysDown = 0;
+            shData->keysHeld = 0;
+
+            for (u8 controller = 0; controller < 8; controller++) {
+                if (hidIsControllerConnected(static_cast<HidControllerID>(controller))) {
+                    shData->keysDown         |= hidKeysDown(static_cast<HidControllerID>(controller));
+                    shData->keysHeld         |= hidKeysHeld(static_cast<HidControllerID>(controller));
+                }
+            }
+
+            if (hidIsControllerConnected(CONTROLLER_HANDHELD)) {
+                shData->keysDown         |= hidKeysDown(CONTROLLER_HANDHELD);
+                shData->keysHeld         |= hidKeysHeld(CONTROLLER_HANDHELD);
+            }
+
 
             shData->touchX           = tmpTouchPosition.px;
             shData->touchY           = tmpTouchPosition.py;
