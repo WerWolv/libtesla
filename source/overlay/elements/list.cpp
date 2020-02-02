@@ -67,7 +67,7 @@ namespace tsl::element {
                 else return nullptr;
             }
             else {
-                if (this->m_items.size() >= this->m_listOffset + 4 && oldFocus == *(this->m_items.begin() + this->m_listOffset + 4)) {
+                if (this->m_items.size() >= size_t(this->m_listOffset + 4) && oldFocus == *(this->m_items.begin() + this->m_listOffset + 4)) {
                     if (this->m_listOffset < this->m_items.size()) {
                         this->m_listOffset++;
                         this->layout();

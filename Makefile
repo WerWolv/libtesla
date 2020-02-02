@@ -24,7 +24,7 @@ INCLUDES	:= include
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC -ftls-model=local-exec
 
-CFLAGS	:=	-g -Wall -Werror \
+CFLAGS	:=	-g -Wall \
 			-ffunction-sections \
 			-fdata-sections \
 			$(ARCH) \
