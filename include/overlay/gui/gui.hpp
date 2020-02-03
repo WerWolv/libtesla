@@ -40,6 +40,9 @@ namespace tsl {
         Gui();
         virtual ~Gui();
 
+        void setTitle(std::string title) { this->m_title = title; }
+        void setSubtitle(std::string subtitle) { this->m_subtitle = subtitle; }
+
         static void init(Screen *screen);
         static void exit();
 
@@ -51,6 +54,10 @@ namespace tsl {
         
         virtual void preDraw(Screen *screen) {
             screen->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
+
+            screen->drawString(this->m_title.c_str(), false, 20, 50, 30, tsl::a(0xFFFF));
+            screen->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, tsl::a(0xFFFF));
+
             screen->drawRect(15, 720 - 73, FB_WIDTH - 30, 1, a(0xFFFF));
             screen->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
         } 
@@ -104,6 +111,9 @@ namespace tsl {
         static void reset();
 
     private:
+        std::string m_title;
+        std::string m_subtitle;
+
         static inline Screen *s_screen = nullptr;
         static inline Gui *s_currGui = nullptr;
         static inline Gui *s_nextGui = nullptr;
