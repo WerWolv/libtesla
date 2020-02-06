@@ -17,9 +17,13 @@
  * along with libtesla.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <chrono>
+
 #include "overlay/gui/gui.hpp"
 
 namespace tsl {
+
+    using namespace std::chrono_literals;
 
     class Overlay {
     public:
@@ -40,8 +44,23 @@ namespace tsl {
 
         static void setNextLoadPath(std::string nextLoadPath) { Overlay::s_nextLoadPath = nextLoadPath; }
         static std::string getNextLoadPath() { return Overlay::s_nextLoadPath; }
+
+        static void startFrameTimer() {
+            s_frameTimerStart = std::chrono::steady_clock::now();
+        }
+        static auto waitFrameEnd() {
+            // Make sure we run at a maximum of 60FPS
+            std::this_thread::sleep_for(16.66ms - (s_frameTimerStart - std::chrono::steady_clock::now()));
+            s_lastFrameDuration = std::chrono::steady_clock::now() - s_frameTimerStart;
+            return s_lastFrameDuration;
+        }
+        static auto getLastFrameTime() {
+            return std::chrono::duration_cast<std::chrono::duration<u64, std::milli>>(s_lastFrameDuration);
+        }
     private:
         static inline Overlay *s_currentOverlay = nullptr;
+        static inline std::chrono::steady_clock::time_point s_frameTimerStart;
+        static inline std::chrono::duration<s64, std::nano> s_lastFrameDuration = 0s;
         static inline std::string s_nextLoadPath = "sdmc:/switch/.overlays/ovlmenu.ovl";
     };
 

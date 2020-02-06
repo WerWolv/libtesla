@@ -57,9 +57,7 @@ namespace tsl {
         return Gui::s_shouldClose;
     }
 
-    void Gui::tick() {
-        auto frameStartTime = std::chrono::steady_clock::now();
-
+    void Gui::guiChange() {
         if (Gui::s_nextGui != nullptr) {
             Gui::removeFocus();
 
@@ -76,11 +74,11 @@ namespace tsl {
             Gui::s_topElement->layout();
             Gui::requestFocus(Gui::s_topElement, FocusDirection::NONE);
         }
+    }
 
+    void Gui::draw() {
         if (Gui::s_currGui == nullptr)
             return;
-
-        Gui::s_currGui->update();
 
         if (Gui::s_topElement != nullptr)
             Gui::s_topElement->frame(Gui::s_screen);
@@ -106,11 +104,6 @@ namespace tsl {
                 Gui::s_animationCounter++;
             }
         }  
-
-        // Make sure we run at a maximum of 60FPS
-        std::this_thread::sleep_for(16.66ms - (frameStartTime - std::chrono::steady_clock::now()));
-
-        Gui::s_lastFrameDuration = std::chrono::steady_clock::now() - frameStartTime;
     }
 
     void Gui::hidUpdate(s64 keysDown, s64 keysHeld, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight, u32 touchX, u32 touchY) {
