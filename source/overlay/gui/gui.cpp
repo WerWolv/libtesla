@@ -120,31 +120,30 @@ namespace tsl {
             if (Overlay::getCurrentOverlay() != nullptr && Gui::getCurrentGui() != nullptr)
                 Overlay::getCurrentOverlay()->onOverlayHide(Gui::getCurrentGui());
 
-        if (Gui::s_focusedElement == nullptr) {
+        if (activeElement == nullptr) {
             if (Gui::s_topElement == nullptr)
                 return;
             else
                 activeElement = Gui::s_topElement;
         }
 
+        bool handled;
+        Element *parentElement = activeElement;
+        do {
+            handled = parentElement->onClick(keysDown);
+            parentElement = parentElement->getParent();
+        } while (!handled && parentElement != nullptr);
 
-        if (keysDown & KEY_UP)
-            Gui::requestFocus(activeElement->getParent(), FocusDirection::UP);
-        else if (keysDown & KEY_DOWN)
-            Gui::requestFocus(activeElement->getParent(), FocusDirection::DOWN);
-        else if (keysDown & KEY_LEFT)
-            Gui::requestFocus(activeElement->getParent(), FocusDirection::LEFT);
-        else if (keysDown & KEY_RIGHT)
-            Gui::requestFocus(activeElement->getParent(), FocusDirection::RIGHT);
-        else {
-            bool handled;
-            Element *parentElement = activeElement;
-            do {
-                handled = parentElement->onClick(keysDown);
-                parentElement = parentElement->getParent();
-            } while (!handled && parentElement != nullptr);
+        if (!handled) {
+            if (keysDown & KEY_UP)
+                Gui::requestFocus(activeElement->getParent(), FocusDirection::UP);
+            else if (keysDown & KEY_DOWN)
+                Gui::requestFocus(activeElement->getParent(), FocusDirection::DOWN);
+            else if (keysDown & KEY_LEFT)
+                Gui::requestFocus(activeElement->getParent(), FocusDirection::LEFT);
+            else if (keysDown & KEY_RIGHT)
+                Gui::requestFocus(activeElement->getParent(), FocusDirection::RIGHT);
         }
-            
     }
 
     void Gui::playIntroAnimation() {
