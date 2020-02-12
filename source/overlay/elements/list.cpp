@@ -24,8 +24,12 @@
 
 namespace tsl::element {
 
-    List::List() {
+    List::List() : List(40, 175, 6) {}
 
+    List::List(u16 x, u16 y, u16 numShown)
+    : m_numShown(numShown)
+    {
+        setPosition(x, y);
     }
 
     List::~List() {
@@ -67,11 +71,10 @@ namespace tsl::element {
                 else return nullptr;
             }
             else {
-                if (this->m_items.size() >= size_t(this->m_listOffset + 4) && oldFocus == *(this->m_items.begin() + this->m_listOffset + 4)) {
-                    if (this->m_listOffset < this->m_items.size()) {
-                        this->m_listOffset++;
-                        this->layout();
-                    }
+                // there are more items hidden and old focus was on second last item
+                if (this->m_items.size() > size_t(this->m_listOffset + this->m_numShown) && oldFocus == *(this->m_items.begin() + this->m_listOffset + this->m_numShown - 2)) {
+                    this->m_listOffset++;
+                    this->layout();
                 }
 
                 return *(it + 1);
@@ -85,7 +88,7 @@ namespace tsl::element {
         u16 i = 0;
         for (auto &item : this->m_items) {
             i++;
-            if (i < this->m_listOffset + 1 || i > (this->m_listOffset + 6))
+            if (i < this->m_listOffset + 1 || i > (this->m_listOffset + this->m_numShown))
                 continue;
 
             item->frame(screen);
@@ -93,13 +96,11 @@ namespace tsl::element {
     }
 
     void List::layout() {
-        this->setPosition(40, 175);
-
-        u16 y = 175;
+        u16 y = this->getPosition().second;
         u16 i = 0;
         for (auto &item : this->m_items) {
             i++;
-            if (i < this->m_listOffset + 1 || i > (this->m_listOffset + 6))
+            if (i < this->m_listOffset + 1 || i > (this->m_listOffset + this->m_numShown))
                 continue;
 
             item->layout();
