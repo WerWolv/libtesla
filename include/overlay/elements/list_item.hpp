@@ -40,6 +40,8 @@ namespace tsl::element {
 
         void setClickListener(std::function<bool(s64 keysDown)> clickListener) { this->m_clickListener = clickListener; }
 
+        void updateText(std::string text);
+
     private:
         std::string m_text;
         std::function<bool(s64 keysDown)> m_clickListener = nullptr;
