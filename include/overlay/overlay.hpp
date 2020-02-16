@@ -50,8 +50,8 @@ namespace tsl {
         }
         static auto waitFrameEnd() {
             // Make sure we run at a maximum of 60FPS
-            std::this_thread::sleep_for(16.66ms - (s_frameTimerStart - std::chrono::steady_clock::now()));
             s_lastFrameDuration = std::chrono::steady_clock::now() - s_frameTimerStart;
+            std::this_thread::sleep_for(16.66ms - s_lastFrameDuration);
             return s_lastFrameDuration;
         }
         static auto getLastFrameTime() {
