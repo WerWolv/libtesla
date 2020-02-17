@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020 WerWolv
+ * Copyright (C) 2020 diwo
  * 
  * This file is part of libtesla.
  * 
@@ -19,14 +19,27 @@
 
 #pragma once
 
-#include "overlay/overlay.hpp"
-#include "overlay/keycombo.hpp"
+#include <functional>
 
-#include "overlay/gui/gui.hpp"
+#include "helpers/json.hpp"
 
-#include "overlay/elements/element.hpp"
-#include "overlay/elements/frame.hpp"
-#include "overlay/elements/list.hpp"
-#include "overlay/elements/list_item.hpp"
-#include "overlay/elements/toggle_list_item.hpp"
-#include "overlay/elements/custom_drawer.hpp"
+namespace tsl {
+
+    using nlohmann::json;
+
+    class Config {
+    public:
+        static json read();
+        static void update(std::function<void(json &)> modify);
+
+    private:
+        static json initialize();
+
+    private:
+        Config() {}
+
+    private:
+        static const char* FILE_PATH;
+    };
+
+}

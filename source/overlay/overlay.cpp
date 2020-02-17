@@ -25,6 +25,7 @@
 
 #include "overlay/screen.hpp"
 #include "overlay/gui/gui.hpp"
+#include "overlay/keycombo.hpp"
 
 #include "overlay/overlay.hpp"
 
@@ -161,8 +162,9 @@ void hidLoop(void *args) {
             shData->joyStickPosRight = tmpJoyStickPosition[HidControllerJoystick::JOYSTICK_RIGHT];
         }
 
-        // Detect overlay key-combo
-        if ((shData->keysHeld & (KEY_L | KEY_DDOWN)) == (KEY_L | KEY_DDOWN) && shData->keysDown & KEY_RSTICK) {
+        if (tsl::KeyCombo::isComboActive(shData->keysHeld, shData->keysDown)) {
+            // Combo keys are handled, should not be propagated to overlay
+            shData->keysDown = 0;
             if (shData->overlayOpen) {
                 if (tsl::Overlay::getCurrentOverlay() != nullptr && tsl::Gui::getCurrentGui() != nullptr)
                     tsl::Overlay::getCurrentOverlay()->onOverlayHide(tsl::Gui::getCurrentGui());
