@@ -29,6 +29,7 @@ namespace tsl::element {
     class List : public Element {
     public:
         List();
+        List(u16 x, u16 y, u16 numShown);
         ~List();
 
         Element* requestFocus(Element *oldFocus, FocusDirection direction) override;
@@ -42,6 +43,7 @@ namespace tsl::element {
 
     private:
         std::vector<ListItem*> m_items;
+        u16 m_numShown;
         u16 m_listOffset = 0;
     };
 
