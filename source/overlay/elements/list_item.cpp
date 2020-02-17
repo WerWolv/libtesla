@@ -55,7 +55,7 @@ namespace tsl::element {
         return false;
     }
 
-    void ListItem::updateText(std::string text) {
+    void ListItem::setText(std::string text) {
         this->m_text = text;
     }
 
