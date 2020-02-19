@@ -62,7 +62,7 @@ namespace tsl::element {
     }
 
     bool Frame::onClick(s64 key) {
-        if (key == KEY_B) {     
+        if (key == KEY_LSTICK) {     
             Gui::goBack();
             return true;
         }
