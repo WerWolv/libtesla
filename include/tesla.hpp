@@ -320,7 +320,7 @@ namespace tsl {
             }
 
             inline void fillScreen(Color color) {
-                std::fill_n(static_cast<Color*>(this->getCurrentFramebuffer()), this->getFramebufferSize(), color);
+                std::fill_n(static_cast<Color*>(this->getCurrentFramebuffer()), this->getFramebufferSize() / sizeof(Color), color);
             }
 
             inline void clearScreen() {
@@ -331,7 +331,7 @@ namespace tsl {
             inline Result initFonts() {
                 Result res;
 
-                PlFontData stdFontData, extFontData;
+                static PlFontData stdFontData, extFontData;
 
                 // Nintendo's default font
                 if(R_FAILED(res = plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard)))
@@ -351,22 +351,27 @@ namespace tsl {
             }
 
             inline void drawGlyph(s32 codepoint, u32 x, u32 y, Color color, stbtt_fontinfo *font, float fontSize) {
-                int width = 0, height = 0;
+                int width = 10, height = 10;
 
                 u8 *glyphBmp = stbtt_GetCodepointBitmap(font, fontSize, fontSize, codepoint, &width, &height, nullptr, nullptr);
                 
-                for (s16 bmpY = 0; bmpY < height; bmpY++)
+                if (glyphBmp == nullptr)
+                    return;
+
+                for (s16 bmpY = 0; bmpY < height; bmpY++) {
                     for (s16 bmpX = 0; bmpX < width; bmpX++) {
                         Color tmpColor = color;
                         tmpColor.a = (glyphBmp[width * bmpY + bmpX] >> 4) * (float(tmpColor.a) / 0xF);
                         this->setPixelBlendSrc(x + bmpX, y + bmpY, tmpColor);
                     }
+                }
 
-                std::free(glyphBmp);                
+                std::free(glyphBmp);
+
             }
 
-            inline void drawString(std::string string, bool monospace, u32 x, u32 y, float fontSize, Color color) {
-                const size_t stringLength = string.length();
+            inline void drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color) {
+                const size_t stringLength = strlen(string);
 
                 u32 currX = x;
                 u32 currY = y;
@@ -376,14 +381,14 @@ namespace tsl {
 
                 do {
                     u32 currCharacter;
-                    ssize_t codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(string.c_str() + i));
+                    ssize_t codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(string + i));
 
                     if (codepointWidth <= 0)
                         break;
 
                     i += codepointWidth;
 
-                    stbtt_fontinfo *currFont;
+                    stbtt_fontinfo *currFont = nullptr;
                     float currFontSize = fontSize / 1000;
 
                     if (stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter)) {
@@ -395,15 +400,6 @@ namespace tsl {
                     else return;
 
                     currX += currFontSize * stbtt_GetCodepointKernAdvance(currFont, prevCharacter, currCharacter);
-
-                    if (currCharacter == '\n') {
-                        currX = x;
-
-                        int ascent = 0;
-                        stbtt_GetFontVMetrics(currFont, &ascent, nullptr, nullptr);
-                        currY += ascent * currFontSize * 1.125F;
-                        continue;
-                    }
 
                     int bounds[4] = { 0 };
                     stbtt_GetCodepointBitmapBoxSubpixel(currFont, currCharacter, currFontSize, currFontSize,
@@ -479,10 +475,10 @@ namespace tsl {
 
             inline const u32 getPixelOffset(u32 x, u32 y) {
                 if (x >= cfg::FramebufferWidth)
-                    x = cfg::FramebufferWidth - 1;
+                    return 0;
 
                 if (y >= cfg::FramebufferHeight)
-                    y = cfg::FramebufferHeight - 1;
+                    return 0;
 
                 if (this->m_scissoring) {
                     if (x < this->m_scissorBounds[0] ||
@@ -609,13 +605,14 @@ namespace tsl {
         Element *m_focusedElement = nullptr;
 
         void drawQuickSettingsBackground(gfx::Renderer *renderer, const char *title, const char *subtitle) {
-            renderer->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
+            renderer->fillScreen({ 0x0, 0x0, 0x0, 0xD });
+            renderer->drawString("Hello", false, 20, 50, 30, 0xFFFF);
 
-            renderer->drawString(title, false, 20, 50, 30, a(0xFFFF));
-            renderer->drawString(subtitle, false, 20, 70, 15, a(0xFFFF));
+            /*renderer->drawString(title, false, 20, 50, 30, a(0xFFFF));
+            renderer->drawString(subtitle, false, 20, 70, 15, a(0xFFFF));*/
 
-            renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
-            renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
+            /*renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
+            renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));*/
         }
 
         template <typename, cfg::OverlayType, typename, typename>
@@ -638,8 +635,8 @@ namespace tsl {
         virtual void onShow() {}    // Called before overlay wants to change from invisible to visible state
         virtual void onHide() {}    // Called before overlay wants to change from visible to invisible state
 
-        virtual std::unique_ptr<Gui>& getCurrentGui() final {
-            return this->m_guiStack.back();
+        virtual Gui* getCurrentGui() final {
+            return this->m_guiStack[this->m_guiStack.size() - 1];
         }
 
         virtual void hide() final {
@@ -661,10 +658,10 @@ namespace tsl {
     protected:
         template<typename G>
         Gui* changeTo() {
-            auto newGui = std::make_unique<G>();
+            auto newGui = new G();
             newGui->m_topElement = newGui->createUI();
 
-            this->m_guiStack.push_back(std::move(newGui));
+            this->m_guiStack.push_back(newGui);
 
             return newGui;
         }
@@ -676,7 +673,7 @@ namespace tsl {
         }
 
     private:       
-        std::vector<std::unique_ptr<Gui>> m_guiStack;
+        std::vector<Gui*> m_guiStack;
 
         bool m_shouldHide = false;
         bool m_shouldClose = false;
@@ -707,9 +704,9 @@ namespace tsl {
                 for (int y = 0; y < tsl::gfx::FramebufferHeight; y++) 
                     Renderer::setPixel(x, y, { 0x0, 0x0, 0x0, 0x0 });*/
 
-            for (int x = 0; x < tsl::cfg::FramebufferWidth - 250; x++)
+            /*for (int x = 0; x < tsl::cfg::FramebufferWidth - 250; x++)
                 for (int y = 0; y < tsl::cfg::FramebufferHeight; y++) 
-                    gfx::Renderer::get().setPixel(x, y, { 0xF, 0xF, 0x0, 0xF });
+                    gfx::Renderer::get().setPixel(x, y, { 0xF, 0xF, 0x0, 0xF });*/
             //Renderer::fillScreen({ 0xF, 0xF, 0x0, 0xF});
 
             gfx::Renderer::get().endFrame();
@@ -875,14 +872,14 @@ namespace tsl {
     }
 
     template<typename T>   
-    inline int loop(int argv, char** argc) {
+    inline int loop(int argc, char** argv) {
         SharedThreadData shData;
 
         Thread hidThread;
         threadCreate(&hidThread, handleHidInput, &shData, nullptr, 0x1000, 0x2C, -2);
         shData.running = true;
 
-        auto overlay = std::make_unique<T>();
+        auto overlay = new T();
         overlay->initScreen();
         overlay->loadDefaultGui();
 
@@ -927,7 +924,7 @@ namespace tsl {
 
 extern "C" {
 
-    u32 __nx_applet_type = AppletType_OverlayApplet;
+    u32 __nx_applet_type = AppletType_None;
     u32 __nx_nv_transfermem_size = 0x15000;
 
 
