@@ -62,9 +62,13 @@ namespace tsl::element {
     }
 
     bool Frame::onClick(s64 key) {
-        if (key == KEY_LSTICK) {     
-            Gui::goBack();
-            return true;
+        if (key == KEY_LSTICK) {
+			hidScanInput();
+			u64 kDown = hidKeysDown(CONTROLLER_P1_AUTO);
+			if (kDown & KEY_RSTICK) {
+				Gui::goBack();
+				return true;
+			}
         }
 
         return false;

@@ -59,7 +59,7 @@ namespace tsl {
             screen->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, tsl::a(0xFFFF));
 
             screen->drawRect(15, 720 - 73, FB_WIDTH - 30, 1, a(0xFFFF));
-            screen->drawString("Hold Left Stick to Exit", false, 30, 693, 23, a(0xFFFF));
+            screen->drawString("Press and hold Left Stick, then click Right Stick to Exit", false, 30, 693, 15, a(0xFFFF));
         } 
 
         virtual void postDraw(Screen *screen) {} 
