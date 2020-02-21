@@ -526,6 +526,8 @@ namespace tsl {
             }
 
             static void setOpacity(float opacity) {
+                opacity = std::clamp(opacity, 0.0F, 1.0F);
+
                 Renderer::s_opacity = opacity;
             }
 
@@ -1068,8 +1070,30 @@ namespace tsl {
             return this->m_guiStack[this->m_guiStack.size() - 1];
         }
 
+        virtual void show() final {
+            if (this->m_disableNextAnimation) {
+                this->m_animationCounter = 5;
+                this->m_disableNextAnimation = false;
+            }
+            else {
+                this->m_fadeInAnimationPlaying = true;
+                this->m_animationCounter = 0;
+            }
+
+            this->onShow();
+        }
+
         virtual void hide() final {
-            this->m_shouldHide = true;
+            if (this->m_disableNextAnimation) {
+                this->m_animationCounter = 0;
+                this->m_disableNextAnimation = false;
+            }
+            else {
+                this->m_fadeOutAnimationPlaying = true;
+                this->m_animationCounter = 5;
+            }
+
+            this->onHide();
         }
 
         virtual void close() final {
@@ -1115,11 +1139,15 @@ namespace tsl {
 
     private:       
         std::vector<std::unique_ptr<tsl::Gui>> m_guiStack;
+        
+        bool m_fadeInAnimationPlaying = true, m_fadeOutAnimationPlaying = false;
+        u8 m_animationCounter = 0;
 
         bool m_shouldHide = false;
         bool m_shouldClose = false;
-        
 
+        bool m_disableNextAnimation = false;
+        
         virtual void loadDefaultGui() final { 
             if (this->m_guiStack.size() != 0) 
                 return;
@@ -1135,11 +1163,32 @@ namespace tsl {
             gfx::Renderer::get().exit();
         }
 
+        virtual void animationLoop() final {
+            if (this->m_fadeInAnimationPlaying) {
+                this->m_animationCounter++;
+
+                if (this->m_animationCounter >= 5)
+                    this->m_fadeInAnimationPlaying = false;
+            }
+
+            if (this->m_fadeOutAnimationPlaying) {
+                this->m_animationCounter--;
+
+                if (this->m_animationCounter == 0) {
+                    this->m_fadeOutAnimationPlaying = false;
+                    this->m_shouldHide = true;
+                }
+            }
+
+            gfx::Renderer::setOpacity(0.2 * this->m_animationCounter);
+        }
+
         virtual void loop() final {
             auto& renderer = gfx::Renderer::get();
 
             renderer.startFrame();
 
+            this->animationLoop();
             this->getCurrentGui()->update();
             this->getCurrentGui()->draw(&renderer);
 
@@ -1193,6 +1242,10 @@ namespace tsl {
         virtual void resetFlags() final {
             this->m_shouldHide = false;
             this->m_shouldClose = false;
+        }
+
+        virtual void disableNextAnimation() final {
+            this->m_disableNextAnimation = true;
         }
 
         template<typename, impl::LaunchFlags launchFlags>
@@ -1300,14 +1353,20 @@ namespace tsl {
                 }
 
                 if (((shData->keysHeld & shData->launchCombo) == shData->launchCombo) && shData->keysDown & shData->launchCombo) {
-                    if (shData->overlayOpen)
+                    if (shData->overlayOpen) {
                         Overlay::get().hide();
+                        shData->overlayOpen = false;
+                    }
                     else
                         eventFire(&shData->comboEvent);
                 }
 
-                if (shData->touchPos.px >= cfg::FramebufferWidth && shData->overlayOpen)
-                    Overlay::get().hide();
+                if (shData->touchPos.px >= cfg::FramebufferWidth && shData->overlayOpen) {
+                    if (shData->overlayOpen) {
+                        Overlay::get().hide();
+                        shData->overlayOpen = false;
+                    }
+                }
 
                 //20 ms
                 svcSleepThread(20E6);
@@ -1326,8 +1385,10 @@ namespace tsl {
                 if (R_SUCCEEDED(eventWait(&shData->homeButtonPressEvent, 100'000'000))) {
                     eventClear(&shData->homeButtonPressEvent);
 
-                    if (shData->overlayOpen)
+                    if (shData->overlayOpen) {
                         Overlay::get().hide();
+                        shData->overlayOpen = false;
+                    }
                 }
             }
 
@@ -1345,8 +1406,10 @@ namespace tsl {
                 if (R_SUCCEEDED(eventWait(&shData->powerButtonPressEvent, 100'000'000))) {
                     eventClear(&shData->powerButtonPressEvent);
 
-                    if (shData->overlayOpen)
+                    if (shData->overlayOpen) {
                         Overlay::get().hide();
+                        shData->overlayOpen = false;
+                    }
                 }
             }
 
@@ -1377,6 +1440,9 @@ namespace tsl {
         overlay.initScreen();
         overlay.loadDefaultGui();
 
+        if (u8(launchFlags) & u8(impl::LaunchFlags::SkipComboInitially))
+            overlay.disableNextAnimation();
+
         while (shData.running) {
             
             eventWait(&shData.comboEvent, UINT64_MAX);
@@ -1385,7 +1451,7 @@ namespace tsl {
 
             hlp::requestForground(true);
 
-            overlay.onShow();
+            overlay.show();
             overlay.clearScreen();
 
             while (shData.running) {
