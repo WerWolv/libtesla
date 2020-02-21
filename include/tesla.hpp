@@ -970,6 +970,22 @@ namespace tsl {
             }
 
 
+            class CustomDrawer : public Element {
+            public:
+                CustomDrawer(std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> renderFunc) : Element(), m_renderFunc(renderFunc) {}
+                ~CustomDrawer() {}
+
+                virtual void draw(gfx::Renderer* renderer) override {
+                    this->m_renderFunc(renderer, this->getX(), this->getY(), this->getWidth(), this->getHeight());
+                }
+
+                virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {}
+
+            private:
+                std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> m_renderFunc;
+            };
+
+
         private:
             struct ListEntry {
                 Element *element;
