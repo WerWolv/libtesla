@@ -107,8 +107,8 @@ namespace tsl {
             }
         }  
 
-        // Make sure we run at a maximum of 60FPS
-        std::this_thread::sleep_for(16.66ms - (frameStartTime - std::chrono::steady_clock::now()));
+        // Make sure we run at a maximum of 1FPS
+        std::this_thread::sleep_for(1000ms - (frameStartTime - std::chrono::steady_clock::now()));
 
         Gui::s_lastFrameDuration = std::chrono::steady_clock::now() - frameStartTime;
     }
