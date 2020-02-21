@@ -22,14 +22,17 @@
 #include <switch.h>
 
 #include <stdlib.h>
-#include <algorithm>
 #include <strings.h>
+
+#include <algorithm>
 #include <cstring>
+#include <cwctype>
 #include <string>
 #include <functional>
 #include <type_traits>
 #include <mutex>
 #include <memory>
+#include <chrono>
 
 
 // Define this makro before including tesla.hpp in your main file. If you intend
@@ -50,6 +53,8 @@
 #define ASSERT_EXIT(x) if (R_FAILED(x)) std::exit(1)
 #define ASSERT_FATAL(x) if (Result res = x; R_FAILED(res)) fatalThrow(res)
 
+using namespace std::literals::chrono_literals;
+
 namespace tsl {
 
     // Constants
@@ -69,10 +74,18 @@ namespace tsl {
     }
 
     // Declarations
-    enum class FocusDirection;
+    enum class FocusDirection {
+        None,
+        Up,
+        Down,
+        Left,
+        Right
+    };
 
     template <typename, typename>
     class Overlay;
+
+    
 
     namespace impl { enum class LaunchFlags : u8; }
 
@@ -400,6 +413,59 @@ namespace tsl {
 
             }
 
+            inline std::pair<u32, u32> getStringBounds(const char* string, bool monospace, float fontSize) {
+                const size_t stringLength = strlen(string);
+
+                u32 maxX = 0;
+
+                u32 currX = 0;
+                u32 currY = 0;
+                u32 prevCharacter = 0;
+
+                u32 i = 0;
+
+                do {
+                    u32 currCharacter;
+                    ssize_t codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(string + i));
+
+                    if (codepointWidth <= 0)
+                        break;
+
+                    i += codepointWidth;
+
+                    stbtt_fontinfo *currFont = nullptr;
+
+                    if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
+                        currFont = &this->m_extFont;
+                    else
+                        currFont = &this->m_stdFont;
+
+                    float currFontSize = stbtt_ScaleForPixelHeight(currFont, fontSize);
+                    currX += currFontSize * stbtt_GetCodepointKernAdvance(currFont, prevCharacter, currCharacter);
+
+                    int xAdvance = 0;
+                    stbtt_GetCodepointHMetrics(currFont, monospace ? 'A' : currCharacter, &xAdvance, nullptr);
+
+                    if (currCharacter == '\n') {
+                        if (currX > maxX)
+                            maxX = currX;
+
+                        currX = 0;
+                        currY += fontSize;
+
+                        continue;
+                    }
+
+                    currX += xAdvance * currFontSize;
+                    
+                } while (i < stringLength);
+
+                if (currX > maxX)
+                    maxX = currX;
+
+                return { maxX, currY }; 
+            }
+
             inline void drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color) {
                 const size_t stringLength = strlen(string);
 
@@ -420,11 +486,10 @@ namespace tsl {
 
                     stbtt_fontinfo *currFont = nullptr;
 
-                    if (stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter) || currCharacter == '\n') 
-                        currFont = &this->m_stdFont; 
-                    else if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
+                    if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
                         currFont = &this->m_extFont;
-                    else break;
+                    else
+                        currFont = &this->m_stdFont;
 
                     float currFontSize = stbtt_ScaleForPixelHeight(currFont, fontSize);
                     currX += currFontSize * stbtt_GetCodepointKernAdvance(currFont, prevCharacter, currCharacter);
@@ -443,7 +508,8 @@ namespace tsl {
                         continue;
                     }
 
-                    this->drawGlyph(currCharacter, currX + bounds[0], currY + bounds[1], color, currFont, currFontSize);
+                   if (!std::iswspace(currCharacter))
+                        this->drawGlyph(currCharacter, currX + bounds[0], currY + bounds[1], color, currFont, currFontSize);
 
                     currX += xAdvance * currFontSize;
                     
@@ -553,9 +619,10 @@ namespace tsl {
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) = 0;
 
             virtual void frame(gfx::Renderer *renderer) final {
-                renderer->enableScissoring(this->getX(), this->getY(), this->getWidth(), this->getHeight());
+                if (this->m_focused)
+                    this->drawHighlight(renderer);
+
                 this->draw(renderer);
-                renderer->disableScissoring();
             }
 
             virtual void invalidate() final {
@@ -567,18 +634,60 @@ namespace tsl {
                     this->layout(parent->getX(), parent->getY(), parent->getWidth(), parent->getHeight());
             }
 
+            virtual void shakeHighlight(FocusDirection direction) final {
+                this->m_highlightShaking = true;
+                this->m_highlightShakingDirection = direction;
+                this->m_highlightShakingStartTime = std::chrono::system_clock::now();
+            }
+
             virtual void drawHighlight(gfx::Renderer *renderer) {
+                static float counter = 0;
+                const float progress = (std::sin(counter) + 1) / 2;
+                gfx::Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
+                                                static_cast<u8>((0x8 - 0xF) * progress + 0xF), 
+                                                static_cast<u8>((0xC - 0xF) * progress + 0xF), 
+                                                0xF };
 
+                counter += 0.1F;
+
+                s32 x = 0, y = 0;
+
+                if (this->m_highlightShaking) {
+                    auto t = (std::chrono::system_clock::now() - this->m_highlightShakingStartTime);
+                    if (t >= 100ms)
+                        this->m_highlightShaking = false;
+                    else {
+                        s32 amplitude = std::rand() % 5 + 5;
+
+                        switch (this->m_highlightShakingDirection) {
+                            case FocusDirection::Up:
+                                y -= shakeAnimation(t, amplitude);
+                                break;
+                            case FocusDirection::Down:
+                                y += shakeAnimation(t, amplitude);
+                                break;
+                            case FocusDirection::Left:
+                                x -= shakeAnimation(t, amplitude);
+                                break;
+                            case FocusDirection::Right:
+                                x += shakeAnimation(t, amplitude);
+                                break;
+                            default:
+                                break;
+                        }
+
+                        x = std::clamp(x, -amplitude, amplitude);
+                        y = std::clamp(y, -amplitude, amplitude);
+                    }
+                }
+
+                renderer->drawRect(this->m_x, this->m_y, this->m_width, this->m_height, a(0xF000));
+
+                renderer->drawRect(this->m_x + x - 4, this->m_y + y - 4, this->m_width + 8, 4, a(highlightColor));
+                renderer->drawRect(this->m_x + x - 4, this->m_y + y + this->m_height, this->m_width + 8, 4, a(highlightColor));
+                renderer->drawRect(this->m_x + x - 4, this->m_y + y, 4, this->m_height, a(highlightColor));
+                renderer->drawRect(this->m_x + x + this->m_width, this->m_y + y, 4, this->m_height, a(highlightColor));
             }
-
-            virtual Element* requestFocus(tsl::FocusDirection direction, Element *oldFocus) final {
-                return this;
-            }
-
-            virtual void shakeHighlight() final {
-                
-            }
-
 
             virtual void setBoundaries(u16 x, u16 y, u16 width, u16 height) final {
                 this->m_x = x;
@@ -595,6 +704,8 @@ namespace tsl {
             virtual void setParent(Element *parent) final { this->m_parent = parent; }
             virtual Element* getParent() final { return this->m_parent; }
 
+            virtual void setFocused(bool focused) { this->m_focused = focused; }
+
         protected:
             constexpr static inline auto a = &gfx::Renderer::a;
 
@@ -603,6 +714,21 @@ namespace tsl {
 
             u16 m_x = 0, m_y = 0, m_width = 0, m_height = 0;
             Element *m_parent = nullptr;
+            bool m_focused = false;
+
+            // Highlight shake animation
+            bool m_highlightShaking = false;
+            std::chrono::system_clock::time_point m_highlightShakingStartTime;
+            FocusDirection m_highlightShakingDirection;
+
+            int shakeAnimation(std::chrono::system_clock::duration t, float a) {
+                float w = 0.2F;
+                float tau = 0.05F;
+
+                int t_ = t.count() / 1'000'000;
+
+                return roundf(a * exp(-(tau * t_) * sin(w * t_)));
+            }
         };
 
 
@@ -615,7 +741,7 @@ namespace tsl {
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->fillScreen({ 0x0, 0x0, 0x0, 0xD });
+                renderer->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
 
                 renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(0xFFFF));
                 renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(0xFFFF));
@@ -631,9 +757,13 @@ namespace tsl {
                 this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
 
                 if (this->m_contentElement != nullptr) {
-                    this->m_contentElement->setBoundaries(parentX + 30, parentY + 90, parentWidth - 60, parentHeight - 90 - 90);
+                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 175, parentWidth - 85, parentHeight - 90 - 100);
                     this->m_contentElement->invalidate();
                 }
+            }
+
+            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
+                return this->m_contentElement->requestFocus(oldFocus, direction);
             }
 
             virtual void setContent(Element *content) final {
@@ -654,13 +784,14 @@ namespace tsl {
             std::string m_title, m_subtitle;
         };
 
+
         class DebugRectangle : public Element {
         public:
             DebugRectangle(gfx::Color color) : Element(), m_color(color) {}
             ~DebugRectangle() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), this->m_color);
+                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a(this->m_color));
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {}
@@ -669,17 +800,193 @@ namespace tsl {
             gfx::Color m_color;
         };
 
+
+        class ListItem : public Element {
+        public:
+            ListItem(std::string text) : Element(), m_text(text) {}
+            ~ListItem() {}
+
+            virtual void draw(gfx::Renderer *renderer) override {
+                if (this->m_valueWidth == 0) {
+                    auto [width, height] = renderer->getStringBounds(this->m_value.c_str(), false, 20);
+                    this->m_valueWidth = width;
+                }
+
+                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
+                renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
+
+                renderer->drawString(this->m_text.c_str(), false, this->getX() + 20, this->getY() + 45, 23, a({ 0xF, 0xF, 0xF, 0xF }));
+
+                renderer->drawString(this->m_value.c_str(), false, this->getX() + this->getWidth() - this->m_valueWidth - 20, this->getY() + 45, 20, this->m_faint ? a({ 0x6, 0x6, 0x6, 0xF }) : a({ 0x5, 0xC, 0xA, 0xF }));
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                
+            }
+
+            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
+                return this;
+            }
+
+
+            virtual void setText(std::string text) final { 
+                this->m_text = text;
+            }
+
+            virtual void setValue(std::string value, bool faint = false) final { 
+                this->m_value = value;
+                this->m_faint = faint;
+                this->m_valueWidth = 0;
+            }
+
+        private:
+            std::string m_text;
+            std::string m_value = "";
+            bool m_faint = false;
+
+            u16 m_valueWidth = 0;
+        };
+
+
+        class ToggleListItem : public ListItem {
+        public:
+            ToggleListItem(std::string text, bool initialState, std::string onValue = "On", std::string offValue = "Off")
+                : ListItem(text), m_state(initialState), m_onValue(onValue), m_offValue(offValue) {
+                
+                this->setState(this->m_state);
+            }
+
+            ~ToggleListItem() {}
+
+            virtual bool onClick(u64 keys) {
+                if (keys & KEY_A) {
+                    this->m_state = !this->m_state;
+
+                    this->setState(this->m_state);
+
+                    return true;
+                }
+
+                return false;
+            }
+
+            virtual bool getState() final {
+                return this->m_state;
+            }
+
+            virtual void setState(bool state) final {
+                if (state)
+                    this->setValue(this->m_onValue, false);
+                else
+                    this->setValue(this->m_offValue, true);
+            }
+
+        private:
+            bool m_state = true;
+            std::string m_onValue, m_offValue;
+        };
+
+
+        class List : public Element {
+        public:
+            List(u16 entriesShown = 5) : Element(), m_entriesShown(entriesShown) {}
+            ~List() {
+                for (auto& item : this->m_items)
+                    delete item.element;
+            }
+
+            virtual void draw(gfx::Renderer *renderer) override {
+                u16 i = 0;
+                for (auto &entry : this->m_items) {
+                    i++;
+                    if (i < this->m_offset || i > this->m_entriesShown + this->m_offset) continue;
+                    entry.element->frame(renderer);
+                }
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                u16 y = this->getY();
+                u16 i = 0;
+                for (auto &entry : this->m_items) {
+                    i++;
+                    if (i < this->m_offset || i > this->m_entriesShown + this->m_offset) continue;
+                    entry.element->setBoundaries(this->getX(), y, this->getWidth(), entry.height);
+                    entry.element->invalidate();
+
+                    y += entry.height;
+                }
+            }
+
+            virtual void addItem(Element *element, u16 height) final {
+                if (element != nullptr && height > 0) {
+                    element->setParent(this);
+                    this->m_items.push_back({ element, height });
+                    this->invalidate();
+                }
+            }   
+
+            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
+                if (this->m_items.size() == 0)
+                    return nullptr;
+
+                auto it = std::find(this->m_items.begin(), this->m_items.end(), oldFocus);
+
+                if (it == this->m_items.end() || direction == FocusDirection::None)
+                    return this->m_items[0].element;
+
+                if (direction == FocusDirection::Up) {
+                    if (it == this->m_items.begin())
+                        return this->m_items[0].element;
+                    else {
+                        if (oldFocus == (this->m_items.begin() + this->m_offset)->element)
+                            if (this->m_offset > 1) {
+                                this->m_offset--;
+                                this->invalidate();
+                            }
+
+                        return (it - 1)->element;
+                    }
+                } else if (direction == FocusDirection::Down) {
+                    if (it == (this->m_items.end() - 1)) {
+                        if (this->m_items.size() > 0)
+                            return this->m_items[this->m_items.size() - 1].element;
+                        else return nullptr;
+                    }
+                    else {
+                        // there are more items hidden and old focus was on second last item
+                        if (this->m_items.size() > size_t(this->m_offset + this->m_entriesShown) && oldFocus == (this->m_items.begin() + this->m_offset + this->m_entriesShown - 2)->element) {
+                            this->m_offset++;
+                            this->invalidate();
+                        }
+
+                        return (it + 1)->element;
+                    }
+                }
+                
+                return it->element;
+            }
+
+
+        private:
+            struct ListEntry {
+                Element *element;
+                u16 height;
+
+                bool operator==(Element *other) {
+                    return this->element == other;
+                }
+            };
+
+            std::vector<ListEntry> m_items;
+            u16 m_focusedElement = 0;
+
+            u16 m_offset = 1;
+            u16 m_entriesShown = 5;
+        };
+
     }
 
     // GUI
-
-    enum class FocusDirection {
-        None,
-        Up,
-        Down,
-        Left,
-        Right
-    };
 
     class Gui {
     public:
@@ -712,10 +1019,20 @@ namespace tsl {
 
         virtual void requestFocus(elm::Element *element, FocusDirection direction) {
             elm::Element *oldFocus = this->m_focusedElement;
-            this->m_focusedElement = element->requestFocus(direction, oldFocus);
+
+            if (element != nullptr) {
+                this->m_focusedElement = element->requestFocus(oldFocus, direction);
+
+                if (oldFocus != nullptr)
+                    oldFocus->setFocused(false);
+
+                if (this->m_focusedElement != nullptr) {
+                    this->m_focusedElement->setFocused(true);
+                }
+            }
 
             if (oldFocus == this->m_focusedElement && this->m_focusedElement != nullptr)
-                this->m_focusedElement->shakeHighlight();
+                this->m_focusedElement->shakeHighlight(direction);
         }
 
         virtual void removeFocus(elm::Element* element = nullptr) {
@@ -727,8 +1044,8 @@ namespace tsl {
         constexpr static inline auto a = &gfx::Renderer::a;
 
     private:
-        elm::Element *m_topElement = nullptr;
         elm::Element *m_focusedElement = nullptr;
+        elm::Element *m_topElement = nullptr;
 
         template <typename, typename>
         friend class Overlay;
@@ -781,6 +1098,7 @@ namespace tsl {
         std::unique_ptr<tsl::Gui>& changeTo() {
             auto newGui = std::make_unique<G>();
             newGui->m_topElement = newGui->createUI();
+            newGui->requestFocus(newGui->m_topElement, FocusDirection::None);
 
             this->m_guiStack.push_back(std::move(newGui));
 
@@ -988,6 +1306,9 @@ namespace tsl {
                         eventFire(&shData->comboEvent);
                 }
 
+                if (shData->touchPos.px >= cfg::FramebufferWidth && shData->overlayOpen)
+                    Overlay::get().hide();
+
                 //20 ms
                 svcSleepThread(20E6);
             }
@@ -1067,15 +1388,15 @@ namespace tsl {
             overlay.onShow();
             overlay.clearScreen();
 
-            shData.dataMutex.lock();
             while (shData.running) {
                 overlay.loop();
 
                 {
-                    shData.dataMutex.unlock();
+                    std::scoped_lock lock(shData.dataMutex);
                     overlay.handleInput(shData.keysDown, shData.keysHeld, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
-                    shData.dataMutex.lock();
 
+                    shData.keysDown = 0x00;
+                    shData.keysHeld = 0x00;
                 }
 
                 if (overlay.shouldHide())
@@ -1084,7 +1405,6 @@ namespace tsl {
                 if (overlay.shouldClose())
                     shData.running = false;
             }
-            shData.dataMutex.unlock();
 
             overlay.clearScreen();
             overlay.resetFlags();
