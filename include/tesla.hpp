@@ -45,7 +45,6 @@
 #define ASSERT_EXIT(x) if (R_FAILED(x)) std::exit(1)
 #define ASSERT_FATAL(x) if (Result res = x; R_FAILED(res)) fatalThrow(res)
 
-
 namespace tsl {
 
     // Constants
@@ -62,31 +61,13 @@ namespace tsl {
         static u16 FramebufferWidth  = 0;
         static u16 FramebufferHeight = 0;
 
-        enum class OverlayType : u8 {
-            QuickSettings,
-            HUD,
-            FreeFloating
-        };
-
         struct QuickSettingsConfig {
             const char* title;
             const char* subtitle;
         };
 
-        struct HUDConfig {
-            const u16 x, y;
-            const u16 width, height;
-        };
-
-        struct FreeFloatingConfig {
-            const u16 initialX, initialY;
-            const u16 width, height;
-        };
-
         struct DefaultOverlayConfig {
             static inline constexpr QuickSettingsConfig QuickSettings = { .title = "Tesla Overlay", .subtitle = "v1.0.0" };
-            static inline constexpr HUDConfig HUD = { .x = 0, .y = 0, .width = 128, .height = 64 };
-            static inline constexpr FreeFloatingConfig FreeFloating = { .initialX = 0, .initialY = 0, .width = 128, .height = 64 };
         };
 
     }
@@ -94,62 +75,108 @@ namespace tsl {
     // Declarations
     enum class FocusDirection;
 
-    template <typename, cfg::OverlayType, typename, typename>
+    template <typename, typename, typename>
     class Overlay;
 
 
     // Helpers
 
-    template<auto> struct dependent_false : std::false_type { };
+    namespace hlp {
 
-    void doWithSmSession(std::function<void()> f) {
-        smInitialize();
-        f();
-        smExit();
-    }
+        template<auto> struct dependent_false : std::false_type { };
+        struct OverlayBase { };
 
-    template<typename T>
-    std::pair<Result, T> readSetting(std::string section, std::string key) {
-        Result res;
-        u64 valueSize;
-        u64 actualSize;
-
-        T buffer;
-        std::memset(&buffer, 0x00, sizeof(buffer));
- 
-        res = setsysGetSettingsItemValueSize(section.c_str(), key.c_str(), &valueSize);
-
-        if (valueSize != sizeof(T))
-            return { 1, T() };
-
-        if (R_SUCCEEDED(res))
-            res = setsysGetSettingsItemValue(section.c_str(), key.c_str(), &buffer, valueSize, &actualSize);
-
-        if (valueSize != actualSize)
-            return { 1, T() };
-
-        return { res, buffer };
-    }
-
-    std::vector<std::string> split(const std::string& str, char delim = ' ') {
-        std::vector<std::string> out;
-
-        std::size_t current, previous = 0;
-        current = str.find(delim);
-        while (current != std::string::npos) {
-            out.push_back(str.substr(previous, current - previous));
-            previous = current + 1;
-            current = str.find(delim, previous);
+        static void doWithSmSession(std::function<void()> f) {
+            smInitialize();
+            f();
+            smExit();
         }
-        out.push_back(str.substr(previous, current - previous));
 
-        return out;
+        template<typename T>
+        static std::pair<Result, T> readSetting(std::string section, std::string key) {
+            Result res;
+            u64 valueSize;
+            u64 actualSize;
+
+            T buffer;
+            std::memset(&buffer, 0x00, sizeof(buffer));
+    
+            res = setsysGetSettingsItemValueSize(section.c_str(), key.c_str(), &valueSize);
+
+            if (valueSize != sizeof(T))
+                return { 1, T() };
+
+            if (R_SUCCEEDED(res))
+                res = setsysGetSettingsItemValue(section.c_str(), key.c_str(), &buffer, valueSize, &actualSize);
+
+            if (valueSize != actualSize)
+                return { 1, T() };
+
+            return { res, buffer };
+        }
+
+        static std::vector<std::string> split(const std::string& str, char delim = ' ') {
+            std::vector<std::string> out;
+
+            std::size_t current, previous = 0;
+            current = str.find(delim);
+            while (current != std::string::npos) {
+                out.push_back(str.substr(previous, current - previous));
+                previous = current + 1;
+                current = str.find(delim, previous);
+            }
+            out.push_back(str.substr(previous, current - previous));
+
+            return out;
+        }
+
+        static u64 stringToKeyCode(std::string &value) {
+            if (strcasecmp(value.c_str(), "A")           == 0)
+                return KEY_A;
+            else if (strcasecmp(value.c_str(), "B")      == 0)
+                return KEY_B;
+            else if (strcasecmp(value.c_str(), "X")      == 0)
+                return KEY_X;
+            else if (strcasecmp(value.c_str(), "Y")      == 0)
+                return KEY_Y;
+            else if (strcasecmp(value.c_str(), "LS")     == 0)
+                return KEY_LSTICK;
+            else if (strcasecmp(value.c_str(), "RS")     == 0)
+                return KEY_RSTICK;
+            else if (strcasecmp(value.c_str(), "L")      == 0)
+                return KEY_L;
+            else if (strcasecmp(value.c_str(), "R")      == 0)
+                return KEY_R;
+            else if (strcasecmp(value.c_str(), "ZL")     == 0)
+                return KEY_ZL;
+            else if (strcasecmp(value.c_str(), "ZR")     == 0)
+                return KEY_ZR;
+            else if (strcasecmp(value.c_str(), "PLUS")   == 0)
+                return KEY_PLUS;
+            else if (strcasecmp(value.c_str(), "MINUS")  == 0)
+                return KEY_MINUS;
+            else if (strcasecmp(value.c_str(), "DLEFT")  == 0)
+                return KEY_DLEFT;
+            else if (strcasecmp(value.c_str(), "DUP")    == 0)
+                return KEY_DUP;
+            else if (strcasecmp(value.c_str(), "DRIGHT") == 0)
+                return KEY_DRIGHT;
+            else if (strcasecmp(value.c_str(), "DDOWN")  == 0)
+                return KEY_DDOWN;
+            else if (strcasecmp(value.c_str(), "SL")     == 0)
+                return KEY_SL;
+            else if (strcasecmp(value.c_str(), "SR")     == 0)
+                return KEY_SR;
+            else return 0;
+        }
+
     }
 
     // Renderer
-    extern "C" u64 __nx_vi_layer_id;
 
     namespace gfx {
+
+        extern "C" u64 __nx_vi_layer_id;
 
         struct Color {
 
@@ -168,55 +195,27 @@ namespace tsl {
         public:
             Renderer& operator=(Renderer&) = delete;
 
-            template <typename, cfg::OverlayType, typename>
+            template <typename, typename>
             friend class tsl::Overlay;
 
             static Color a(const Color &c) {
                 return (c.rgba & 0x0FFF) | (static_cast<u8>(c.a * Renderer::s_opacity) << 12);
             }
 
-            template<cfg::OverlayType overlayType, typename OverlayConfig>
+            template<typename OverlayConfig>
             void init() {
 
-                if constexpr (overlayType == cfg::OverlayType::QuickSettings) {
-
-                    cfg::LayerPosX = 0;
-                    cfg::LayerPosY = 0;
-                    cfg::FramebufferWidth  = 448;
-                    cfg::FramebufferHeight = 720;
-                    cfg::LayerWidth  = cfg::ScreenHeight * (float(cfg::FramebufferWidth) / float(cfg::FramebufferHeight));
-                    cfg::LayerHeight = cfg::ScreenHeight;
-
-                } else if constexpr (overlayType == cfg::OverlayType::HUD) {
-
-                    static_assert(OverlayConfig::HUD::width % 64  == 0,  "Framebuffer width needs to be aligned to 64!");
-                    static_assert(OverlayConfig::HUD::height % 128 == 0, "Framebuffer height needs to be aligned to 128!");
-
-                    cfg::LayerWidth  = OverlayConfig::HUD::width;
-                    cfg::LayerHeight = OverlayConfig::HUD::height;
-                    cfg::FramebufferWidth  = OverlayConfig::HUD::width;
-                    cfg::FramebufferHeight = OverlayConfig::HUD::height;
-                    cfg::LayerPosX   = OverlayConfig::HUD::x;
-                    cfg::LayerPosY   = OverlayConfig::HUD::y;
-
-                } else if constexpr (overlayType == cfg::OverlayType::FreeFloating) {
-
-                    static_assert(OverlayConfig::FreeFloating::width % 64  == 0,  "Framebuffer width needs to be aligned to 64!");
-                    static_assert(OverlayConfig::FreeFloating::height % 128 == 0, "Framebuffer height needs to be aligned to 128!");
-                
-                    cfg::LayerWidth  = OverlayConfig::FreeFloating::width;
-                    cfg::LayerHeight = OverlayConfig::FreeFloating::height;
-                    cfg::FramebufferWidth  = OverlayConfig::HUD::width;
-                    cfg::FramebufferHeight = OverlayConfig::HUD::height;
-                    cfg::LayerPosX   = OverlayConfig::HUD::initialX;
-                    cfg::LayerPosY   = OverlayConfig::HUD::initialY;
-
-                } else static_assert(dependent_false<overlayType>::value, "Invalid Gui Type specified");
+                cfg::LayerPosX = 0;
+                cfg::LayerPosY = 0;
+                cfg::FramebufferWidth  = 448;
+                cfg::FramebufferHeight = 720;
+                cfg::LayerWidth  = cfg::ScreenHeight * (float(cfg::FramebufferWidth) / float(cfg::FramebufferHeight));
+                cfg::LayerHeight = cfg::ScreenHeight;
 
                 if (this->m_initialized)
                     return;
 
-                tsl::doWithSmSession([this]{
+                tsl::hlp::doWithSmSession([this]{
                     ASSERT_FATAL(viInitialize(ViServiceType_Manager));
                     ASSERT_FATAL(viOpenDefaultDisplay(&this->m_display));
                     ASSERT_FATAL(viGetDisplayVsyncEvent(&this->m_display, &this->m_vsyncEvent));
@@ -247,7 +246,7 @@ namespace tsl {
                 nwindowClose(&this->m_window);
                 viCloseLayer(&this->m_layer);
                 viDestroyManagedLayer(&layerCopy); // Copy is required because viCloseLayer wipes the passed layer object
-                
+                viExit();
             }
 
             void startFrame() {
@@ -278,6 +277,9 @@ namespace tsl {
 
             // Drawing functions
             inline void setPixel(u16 x, u16 y, Color color) {
+                if (x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
+                    return;
+
                 static_cast<Color*>(this->getCurrentFramebuffer())[this->getPixelOffset(x, y)] = color;
             }
 
@@ -288,6 +290,9 @@ namespace tsl {
             }
 
             inline void setPixelBlendSrc(u16 x, u16 y, Color color) {
+                if (x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
+                    return;
+
                 Color src((static_cast<u16*>(this->getCurrentFramebuffer()))[this->getPixelOffset(x, y)]);
                 Color dst(color);
                 Color end(0);
@@ -301,6 +306,9 @@ namespace tsl {
             }
 
             inline void setPixelBlendDst(u16 x, u16 y, Color color) {
+                if (x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
+                    return;
+
                 Color src((static_cast<u16*>(this->getCurrentFramebuffer()))[this->getPixelOffset(x, y)]);
                 Color dst(color);
                 Color end(0);
@@ -313,9 +321,9 @@ namespace tsl {
                 this->setPixel(x, y, end);
             }
 
-            inline void drawRect(u16 x1, u16 y1, u16 x2, u16 y2, Color color) {
-                for (; x1 < x2; x1++)
-                    for (; y1 < y2; y1++)
+            inline void drawRect(u16 x, u16 y, u16 w, u16 h, Color color) {
+                for (s16 x1 = x; x1 < (x + w); x1++)
+                    for (s16 y1 = y; y1 < (y + h); y1++)
                         this->setPixelBlendDst(x1, y1, color);
             }
 
@@ -389,7 +397,6 @@ namespace tsl {
                     i += codepointWidth;
 
                     stbtt_fontinfo *currFont = nullptr;
-                    float currFontSize = fontSize / 1000;
 
                     if (stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter)) {
                         currFont = &this->m_stdFont;
@@ -399,14 +406,24 @@ namespace tsl {
                     }
                     else return;
 
+                    float currFontSize = stbtt_ScaleForPixelHeight(currFont, fontSize);
+
+                    if (currCharacter == '\n') {
+                        currX = x;
+                        currY += currFontSize;
+
+                        if (i < stringLength) continue;
+                        else break;
+                    }
+
                     currX += currFontSize * stbtt_GetCodepointKernAdvance(currFont, prevCharacter, currCharacter);
 
                     int bounds[4] = { 0 };
                     stbtt_GetCodepointBitmapBoxSubpixel(currFont, currCharacter, currFontSize, currFontSize,
                                                         0, 0, &bounds[0], &bounds[1], &bounds[2], &bounds[3]);
 
-                    int xAdvance;
-                    stbtt_GetCodepointHMetrics(currFont, currCharacter, &xAdvance, nullptr);
+                    int xAdvance = 0;
+                    stbtt_GetCodepointHMetrics(currFont, monospace ? 'A' : currCharacter, &xAdvance, nullptr);
 
                     this->drawGlyph(currCharacter, currX + bounds[0], currY + bounds[1], color, currFont, currFontSize);
 
@@ -442,7 +459,7 @@ namespace tsl {
 
             stbtt_fontinfo m_stdFont, m_extFont;
 
-            static inline float s_opacity = 0.0F;
+            static inline float s_opacity = 1.0F;
 
                     
             void* getCurrentFramebuffer() {
@@ -474,12 +491,6 @@ namespace tsl {
             }
 
             inline const u32 getPixelOffset(u32 x, u32 y) {
-                if (x >= cfg::FramebufferWidth)
-                    return 0;
-
-                if (y >= cfg::FramebufferHeight)
-                    return 0;
-
                 if (this->m_scissoring) {
                     if (x < this->m_scissorBounds[0] ||
                         y < this->m_scissorBounds[1] ||
@@ -499,63 +510,75 @@ namespace tsl {
 
     }
 
-    static auto &a = tsl::gfx::Renderer::a;
-
     // Elements
 
-    class Element {
-    public:
-        Element() {}
-        virtual ~Element() {}
+    namespace elm {
 
-        virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) {
-            return nullptr;
-        }
+        class Element {
+        public:
+            Element() {}
+            virtual ~Element() {}
 
-        virtual bool onClick(u64 keys) {
-            return false;
-        }
+            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) {
+                return nullptr;
+            }
 
-        virtual bool onTouch(u32 x, u32 y) {
-            return false;
-        }
+            virtual bool onClick(u64 keys) {
+                return false;
+            }
 
-        virtual void draw(gfx::Renderer *renderer) = 0;
-        virtual void layout() = 0;
+            virtual bool onTouch(u32 x, u32 y) {
+                return false;
+            }
 
-        virtual void drawHighlight(gfx::Renderer *renderer) {
+            virtual void draw(gfx::Renderer *renderer) = 0;
+            virtual void layout() = 0;
 
-        }
+            virtual void frame(gfx::Renderer *renderer) final {
+                renderer->enableScissoring(this->getX(), this->getY(), this->getWidth(), this->getHeight());
+                this->draw(renderer);
+                renderer->disableScissoring();
+            }
 
-        virtual Element* requestFocus(tsl::FocusDirection direction, Element *oldFocus) final {
-            return this;
-        }
+            virtual void drawHighlight(gfx::Renderer *renderer) {
 
-        virtual void shakeHighlight() final {
-            
-        }
+            }
+
+            virtual Element* requestFocus(tsl::FocusDirection direction, Element *oldFocus) final {
+                return this;
+            }
+
+            virtual void shakeHighlight() final {
+                
+            }
 
 
-        virtual void setBoundaries(u16 x, u16 y, u16 width, u16 height) final {
-            this->m_x = x;
-            this->m_y = y;
-            this->m_width = width;
-            this->m_height = height;
-        }
+            virtual void setBoundaries(u16 x, u16 y, u16 width, u16 height) final {
+                this->m_x = x;
+                this->m_y = y;
+                this->m_width = width;
+                this->m_height = height;
+            }
 
-        virtual u16 getX() final { return this->m_x; }
-        virtual u16 getY() final { return this->m_y; }
-        virtual u16 getWidth()  final { return this->m_width;  }
-        virtual u16 getHeight() final { return this->m_height; }
+            virtual u16 getX() final { return this->m_x; }
+            virtual u16 getY() final { return this->m_y; }
+            virtual u16 getWidth()  final { return this->m_width;  }
+            virtual u16 getHeight() final { return this->m_height; }
 
-        virtual void setParent(Element *parent) final { this->m_parent = parent; }
-        virtual Element* getParent() final { return this->m_parent; }
-    private:
-        friend class Gui;
+            virtual void setParent(Element *parent) final { this->m_parent = parent; }
+            virtual Element* getParent() final { return this->m_parent; }
 
-        u16 m_x, m_y, m_width, m_height;
-        Element *m_parent;
-    };
+        protected:
+            constexpr static inline auto a = &gfx::Renderer::a;
+
+        private:
+            friend class Gui;
+
+            u16 m_x, m_y, m_width, m_height;
+            Element *m_parent;
+        };
+
+    }
 
     // GUI
 
@@ -579,63 +602,66 @@ namespace tsl {
         virtual void initServices() {}
         virtual void exitServices() {}
 
-        virtual Element* createUI() = 0;
+        virtual elm::Element* createUI() = 0;
         virtual void update() {}
         virtual void onInput(u64 keysDown, u64 keysHeld, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick, touchPosition touchInput) {}
 
-        virtual Element* getTopElement() final {
+        virtual elm::Element* getTopElement() final {
             return this->m_topElement;
         }
 
-        virtual void requestFocus(Element *element, FocusDirection direction) {
-            Element *oldFocus = this->m_focusedElement;
+        virtual elm::Element* getFocusedElement() final {
+            return this->m_focusedElement;
+        }
+
+        virtual void requestFocus(elm::Element *element, FocusDirection direction) {
+            elm::Element *oldFocus = this->m_focusedElement;
             this->m_focusedElement = element->requestFocus(direction, oldFocus);
 
             if (oldFocus == this->m_focusedElement && this->m_focusedElement != nullptr)
                 this->m_focusedElement->shakeHighlight();
         }
 
-        virtual void removeFocus(Element* element = nullptr) {
+        virtual void removeFocus(elm::Element* element = nullptr) {
             if (element == nullptr || element == this->m_focusedElement)
                 this->m_focusedElement = nullptr;
         }
 
+    protected:
+        constexpr static inline auto a = &gfx::Renderer::a;
+
     private:
-        Element *m_topElement = nullptr;
-        Element *m_focusedElement = nullptr;
+        elm::Element *m_topElement = nullptr;
+        elm::Element *m_focusedElement = nullptr;
 
         void drawQuickSettingsBackground(gfx::Renderer *renderer, const char *title, const char *subtitle) {
             renderer->fillScreen({ 0x0, 0x0, 0x0, 0xD });
-            renderer->drawString("Hello", false, 20, 50, 30, 0xFFFF);
 
-            /*renderer->drawString(title, false, 20, 50, 30, a(0xFFFF));
-            renderer->drawString(subtitle, false, 20, 70, 15, a(0xFFFF));*/
+            renderer->drawString(title, false, 20, 50, 30, a(0xFFFF));
+            renderer->drawString(subtitle, false, 20, 70, 15, a(0xFFFF));
 
-            /*renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
-            renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));*/
+            renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
+            renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
         }
 
-        template <typename, cfg::OverlayType, typename, typename>
+        template <typename, typename, typename>
         friend class Overlay;
-        friend class Renderer;
+        friend class gfx::Renderer;
     };
 
 
     // Overlay
 
-    template<typename Gui, cfg::OverlayType overlayType, typename OverlayConfig, typename Enabled = void>
+    template<typename Gui, typename OverlayConfig, typename Enabled = void>
     class Overlay;
 
-    template <typename T, cfg::OverlayType overlayType, typename OverlayConfig>
-    class Overlay<T, overlayType, OverlayConfig, std::enable_if_t<std::is_base_of_v<tsl::Gui, T>>> {
+    template <typename Gui, typename OverlayConfig>
+    class Overlay<Gui, OverlayConfig, std::enable_if_t<std::is_base_of_v<tsl::Gui, Gui>>> : private hlp::OverlayBase {
     public:
-        Overlay() {}                // Called once when overlay gets loaded
-        virtual ~Overlay() {}       // Called once before overlay exits and 
-
         virtual void onShow() {}    // Called before overlay wants to change from invisible to visible state
         virtual void onHide() {}    // Called before overlay wants to change from visible to invisible state
 
-        virtual Gui* getCurrentGui() final {
+        virtual std::unique_ptr<tsl::Gui>& getCurrentGui() final {
             return this->m_guiStack[this->m_guiStack.size() - 1];
         }
 
@@ -655,25 +681,36 @@ namespace tsl {
             return this->m_shouldClose;
         }
 
+        static auto& get() {
+            static Overlay overlay;
+
+            return overlay;
+        }
+
     protected:
+        Overlay() {}                // Called once when overlay gets loaded
+        virtual ~Overlay() {}       // Called once before overlay exits and 
+
         template<typename G>
-        Gui* changeTo() {
-            auto newGui = new G();
+        std::unique_ptr<tsl::Gui>& changeTo() {
+            auto newGui = std::make_unique<G>();
             newGui->m_topElement = newGui->createUI();
 
-            this->m_guiStack.push_back(newGui);
+            this->m_guiStack.push_back(std::move(newGui));
 
-            return newGui;
+            return this->m_guiStack.back();
         }
 
         void goBack() {
-            auto &topGui = this->m_guiStack.back();
+            if (this->m_guiStack.size() > 0)
+                this->m_guiStack.pop_back();
 
-            delete topGui;
+            if (this->m_guiStack.size() == 0)
+                this->close();
         }
 
     private:       
-        std::vector<Gui*> m_guiStack;
+        std::vector<std::unique_ptr<tsl::Gui>> m_guiStack;
 
         bool m_shouldHide = false;
         bool m_shouldClose = false;
@@ -683,11 +720,11 @@ namespace tsl {
             if (this->m_guiStack.size() != 0) 
                 return;
 
-            this->changeTo<T>();
+            this->changeTo<Gui>();
         }
 
         virtual void initScreen() final {
-            gfx::Renderer::get().init<overlayType, OverlayConfig>();
+            gfx::Renderer::get().init<OverlayConfig>();
         }
 
         virtual void exitScreen() final {
@@ -697,225 +734,235 @@ namespace tsl {
         virtual void loop() final {
             gfx::Renderer::get().startFrame();
 
-            if constexpr (overlayType == cfg::OverlayType::QuickSettings)
-                this->getCurrentGui()->drawQuickSettingsBackground(&gfx::Renderer::get(), OverlayConfig::QuickSettings.title, OverlayConfig::QuickSettings.subtitle);
-
-            /*for (int x = 0; x < tsl::gfx::FramebufferWidth; x++)
-                for (int y = 0; y < tsl::gfx::FramebufferHeight; y++) 
-                    Renderer::setPixel(x, y, { 0x0, 0x0, 0x0, 0x0 });*/
-
-            /*for (int x = 0; x < tsl::cfg::FramebufferWidth - 250; x++)
-                for (int y = 0; y < tsl::cfg::FramebufferHeight; y++) 
-                    gfx::Renderer::get().setPixel(x, y, { 0xF, 0xF, 0x0, 0xF });*/
-            //Renderer::fillScreen({ 0xF, 0xF, 0x0, 0xF});
+            this->getCurrentGui()->drawQuickSettingsBackground(&gfx::Renderer::get(), OverlayConfig::QuickSettings.title, OverlayConfig::QuickSettings.subtitle);
 
             gfx::Renderer::get().endFrame();
         }
 
+        virtual void handleInput(u64 keysDown, u64 keysHeld, touchPosition touchPos, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight) final {
+            auto& currentGui = this->getCurrentGui();
+            auto currentFocus = currentGui->getFocusedElement();
+
+            if (currentFocus == nullptr) {
+                if (elm::Element* topElement = currentGui->getTopElement(); topElement == nullptr) {
+                    if (keysDown & KEY_B) 
+                        this->goBack();
+
+                    return;
+                }
+                else
+                    currentFocus = topElement;
+            }
+
+            bool handled = false;
+            elm::Element *parentElement = currentFocus;
+            do {
+                handled = parentElement->onClick(keysDown);
+                parentElement = parentElement->getParent();
+            } while (!handled && parentElement != nullptr);
+
+            if (!handled) {
+                if (keysDown & KEY_UP)
+                    currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Up);
+                else if (keysDown & KEY_DOWN)
+                    currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Down);
+                else if (keysDown & KEY_LEFT)
+                    currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Left);
+                else if (keysDown & KEY_RIGHT)
+                    currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Right);
+                else if (keysDown & KEY_B) 
+                    this->goBack();
+            }
+        }
+
         virtual void clearScreen() final {
             gfx::Renderer::get().startFrame();
+
             gfx::Renderer::get().clearScreen();
+
             gfx::Renderer::get().endFrame();
         }
 
         template<typename>
         friend int loop(int argv, char** argc);
-        friend class Gui;
+        friend class tsl::Gui;
     };
 
-    // Main Loop
     
-    struct SharedThreadData {
-        std::mutex dataMutex;
-        bool running = false;
-
-        Event comboEvent;
-        u64 unlockKeys = 0, triggerKey = 0;
-        bool overlayOpen = false;
-
-        u64 keysDown = 0;
-        u64 keysHeld = 0;
-        touchPosition touchPos = { 0 };
-        JoystickPosition joyStickPosLeft = { 0 }, joyStickPosRight = { 0 };
-    };
-
-    static u64 stringToKeyCode(std::string &value) {
-        if (strcasecmp(value.c_str(), "A")             == 0)
-            return KEY_A;
-        else if (strcasecmp(value.c_str(), "B")      == 0)
-            return KEY_B;
-        else if (strcasecmp(value.c_str(), "X")      == 0)
-            return KEY_X;
-        else if (strcasecmp(value.c_str(), "Y")      == 0)
-            return KEY_Y;
-        else if (strcasecmp(value.c_str(), "LS")     == 0)
-            return KEY_LSTICK;
-        else if (strcasecmp(value.c_str(), "RS")     == 0)
-            return KEY_RSTICK;
-        else if (strcasecmp(value.c_str(), "L")      == 0)
-            return KEY_L;
-        else if (strcasecmp(value.c_str(), "R")      == 0)
-            return KEY_R;
-        else if (strcasecmp(value.c_str(), "ZL")     == 0)
-            return KEY_ZL;
-        else if (strcasecmp(value.c_str(), "ZR")     == 0)
-            return KEY_ZR;
-        else if (strcasecmp(value.c_str(), "PLUS")   == 0)
-            return KEY_PLUS;
-        else if (strcasecmp(value.c_str(), "MINUS")  == 0)
-            return KEY_MINUS;
-        else if (strcasecmp(value.c_str(), "DLEFT")  == 0)
-            return KEY_DLEFT;
-        else if (strcasecmp(value.c_str(), "DUP")    == 0)
-            return KEY_DUP;
-        else if (strcasecmp(value.c_str(), "DRIGHT") == 0)
-            return KEY_DRIGHT;
-        else if (strcasecmp(value.c_str(), "DDOWN")  == 0)
-            return KEY_DDOWN;
-        else if (strcasecmp(value.c_str(), "SL")     == 0)
-            return KEY_SL;
-        else if (strcasecmp(value.c_str(), "SR")     == 0)
-            return KEY_SR;
-        else return 0;
-    }
-
-    static void parseOverlaySettings(u64 &unlockKeys, u64 &triggerKey) {
-        std::string unlockKeysStr;
-        std::string triggerKeyStr;
-
-        {
-            auto [result, setting] = readSetting<std::array<char, 20>>("tesla", "combo_unlock_keys");
-
-            if (R_SUCCEEDED(result))
-                unlockKeysStr = std::string(setting.begin(), setting.end());
-            
-            if (R_FAILED(result) || unlockKeysStr == "")
-                unlockKeysStr = "L&DDOWN";
-        }
-
-        {
-            auto [result, setting] = readSetting<std::array<char, 20>>("tesla", "combo_trigger_key");
-
-            if (R_SUCCEEDED(result))
-                triggerKeyStr = std::string(setting.begin(), setting.end());
-            
-            if (R_FAILED(result) || triggerKeyStr == "")
-                triggerKeyStr = "RS";
-        }
-
-        for (std::string key : tsl::split(unlockKeysStr, '&'))
-            unlockKeys |= tsl::stringToKeyCode(key);
-
-        triggerKey = tsl::stringToKeyCode(triggerKeyStr);
-    }
-
-    static void handleHidInput(void *args) {
-        SharedThreadData &shData = *static_cast<SharedThreadData*>(args);
-
-        eventCreate(&shData.comboEvent, false);
-
-        JoystickPosition tmpJoyStickPosition[2] = { 0 };
-        touchPosition tmpTouchPosition = { 0 };
+    namespace impl {
         
-        // Parse Tesla settings
-        tsl::parseOverlaySettings(shData.unlockKeys, shData.triggerKey);
+        struct SharedThreadData {
+            std::mutex dataMutex;
+            bool running = false;
 
-        // Drop all inputs from the previous overlay
-        hidScanInput();
+            Event comboEvent, homeButtonPressEvent;
 
-        while (shData.running) {
-            
-            // Scan for button presses
-            hidScanInput();
+            u64 launchCombo = 0;
+            bool overlayOpen = false;
 
-            // Read in touch positions
-            if (hidTouchCount() > 0)
-                hidTouchRead(&tmpTouchPosition, 0);
-            else 
-                tmpTouchPosition = { 0 };
-            // Read in joystick values
-            hidJoystickRead(&tmpJoyStickPosition[HidControllerJoystick::JOYSTICK_LEFT], CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_LEFT);
-            hidJoystickRead(&tmpJoyStickPosition[HidControllerJoystick::JOYSTICK_RIGHT], CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_RIGHT);
+            u64 keysDown = 0;
+            u64 keysHeld = 0;
+            touchPosition touchPos = { 0 };
+            JoystickPosition joyStickPosLeft = { 0 }, joyStickPosRight = { 0 };
+        };
+
+        static void parseOverlaySettings(u64 &launchCombo) {
+            std::string launchComboString;
 
             {
-                std::scoped_lock lock(shData.dataMutex);
+                auto [result, setting] = hlp::readSetting<std::array<char, 20>>("tesla", "launch_combo");
 
-                shData.keysDown = 0;
-                shData.keysHeld = 0;
-
-                for (u8 controller = 0; controller < 8; controller++) {
-                    if (hidIsControllerConnected(static_cast<HidControllerID>(controller))) {
-                        shData.keysDown |= hidKeysDown(static_cast<HidControllerID>(controller));
-                        shData.keysHeld |= hidKeysHeld(static_cast<HidControllerID>(controller));
-                    }
-                }
-
-                if (hidIsControllerConnected(CONTROLLER_HANDHELD)) {
-                    shData.keysDown |= hidKeysDown(CONTROLLER_HANDHELD);
-                    shData.keysHeld |= hidKeysHeld(CONTROLLER_HANDHELD);
-                }
-
-
-                shData.touchPos         = tmpTouchPosition;
-
-                shData.joyStickPosLeft  = tmpJoyStickPosition[HidControllerJoystick::JOYSTICK_LEFT];
-                shData.joyStickPosRight = tmpJoyStickPosition[HidControllerJoystick::JOYSTICK_RIGHT];
-
+                if (R_SUCCEEDED(result))
+                    launchComboString = std::string(setting.begin(), setting.end());
+                
+                if (R_FAILED(result) || launchComboString == "")
+                    launchComboString = "L&DDOWN&RS";
             }
 
-            if ((shData.keysHeld & shData.unlockKeys) == shData.unlockKeys)
-                if ((shData.keysDown & shData.triggerKey) == shData.triggerKey)
-                    eventFire(&shData.comboEvent);
-
-            svcSleepThread(20'000'000);
+            for (std::string key : hlp::split(launchComboString, '&'))
+                launchCombo |= hlp::stringToKeyCode(key);
         }
+
+        template<typename Overlay>
+        static void hidInputPoller(void *args) {
+            SharedThreadData *shData = static_cast<SharedThreadData*>(args);
+
+            eventCreate(&shData->comboEvent, false);
+            eventFire(&shData->comboEvent);
+
+            // Parse Tesla settings
+            impl::parseOverlaySettings(shData->launchCombo);
+
+            // Drop all inputs from the previous overlay
+            hidScanInput();
+
+            while (shData->running) {
+                
+                // Scan for input changes
+                hidScanInput();
+
+                // Read in HID values
+                {
+                    std::scoped_lock lock(shData->dataMutex);
+
+                    shData->keysDown = 0;
+                    shData->keysHeld = 0;
+
+                    // Combine input from all controllers
+                    for (u8 controller = 0; controller < 8; controller++) {
+                        if (hidIsControllerConnected(static_cast<HidControllerID>(controller))) {
+                            shData->keysDown |= hidKeysDown(static_cast<HidControllerID>(controller));
+                            shData->keysHeld |= hidKeysHeld(static_cast<HidControllerID>(controller));
+                        }
+                    }
+
+                    if (hidIsControllerConnected(CONTROLLER_HANDHELD)) {
+                        shData->keysDown |= hidKeysDown(CONTROLLER_HANDHELD);
+                        shData->keysHeld |= hidKeysHeld(CONTROLLER_HANDHELD);
+                    }
+
+                    // Read in touch positions
+                    if (hidTouchCount() > 0)
+                        hidTouchRead(&shData->touchPos, 0);
+                    else 
+                        shData->touchPos = { 0 };
+
+                    // Read in joystick values
+                    hidJoystickRead(&shData->joyStickPosLeft, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_LEFT);
+                    hidJoystickRead(&shData->joyStickPosRight, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_RIGHT);
+
+                }
+
+                if (((shData->keysHeld & shData->launchCombo) == shData->launchCombo) && shData->keysDown & shData->launchCombo) {
+                    if (shData->overlayOpen)
+                        Overlay::get().hide();
+                    else
+                        eventFire(&shData->comboEvent);
+                }
+
+                //20 ms
+                svcSleepThread(20E6);
+            }
+        }
+
+        template<typename Overlay>
+        static void homeButtonPoller(void *args) {
+            SharedThreadData *shData = static_cast<SharedThreadData*>(args);
+
+            hidsysAcquireHomeButtonEventHandle(&shData->homeButtonPressEvent);
+            eventClear(&shData->homeButtonPressEvent);
+
+            while (shData->running) {
+                if (R_SUCCEEDED(eventWait(&shData->homeButtonPressEvent, 1'000'000))) {
+                    eventClear(&shData->homeButtonPressEvent);
+                    Overlay::get().hide();
+                }
+            }
+
+        }
+
     }
 
-    template<typename T>   
-    inline int loop(int argc, char** argv) {
-        SharedThreadData shData;
 
-        Thread hidThread;
-        threadCreate(&hidThread, handleHidInput, &shData, nullptr, 0x1000, 0x2C, -2);
+
+    template<typename Overlay>   
+    static inline int loop(int argc, char** argv) {
+        static_assert(std::is_base_of_v<tsl::hlp::OverlayBase, Overlay>, "tsl::loop expects a type derived from tsl::Overlay");
+
+        impl::SharedThreadData shData;
+
         shData.running = true;
 
-        auto overlay = new T();
-        overlay->initScreen();
-        overlay->loadDefaultGui();
+        Thread hidPollerThread, homeButtonPollerThread;
+        threadCreate(&hidPollerThread, impl::hidInputPoller<Overlay>, &shData, nullptr, 0x1000, 0x2C, -2);
+        threadCreate(&homeButtonPollerThread, impl::homeButtonPoller<Overlay>, &shData, nullptr, 0x1000, 0x2C, -2);
+        threadStart(&hidPollerThread);
+        threadStart(&homeButtonPollerThread);
 
 
-        threadStart(&hidThread);
+        auto& overlay = Overlay::get();
+        overlay.initScreen();
+        overlay.loadDefaultGui();
+
+
         while (shData.running) {
-
+            
             eventWait(&shData.comboEvent, UINT64_MAX);
             eventClear(&shData.comboEvent);
             shData.overlayOpen = true;
 
-            overlay->m_shouldHide = false;
-            overlay->onShow();
+            overlay.m_shouldHide = false;
+            overlay.onShow();
 
-            overlay->clearScreen();
+            overlay.clearScreen();
 
             while (shData.running) {
-                overlay->loop();
+                overlay.loop();
+                overlay.handleInput(shData.keysDown, shData.keysHeld, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
 
-                if (overlay->shouldHide())
+                if (overlay.shouldHide())
                     break;
                 
-                if (overlay->shouldClose())
+                if (overlay.shouldClose())
                     shData.running = false;
             }
 
-            overlay->clearScreen();
+            overlay.clearScreen();
             shData.overlayOpen = false;
-
+            eventClear(&shData.comboEvent);
         }
 
+        eventClose(&shData.homeButtonPressEvent);
+        eventClose(&shData.comboEvent);
 
-        threadWaitForExit(&hidThread);
-        threadClose(&hidThread);
+        threadWaitForExit(&hidPollerThread);
+        threadClose(&hidPollerThread);
+        threadWaitForExit(&homeButtonPollerThread);
+        threadClose(&homeButtonPollerThread);
 
-        overlay->exitScreen();
+        overlay.exitScreen();
+
+        envSetNextLoad("", "--initial-load");
         
         return 0;
     }
@@ -924,12 +971,12 @@ namespace tsl {
 
 extern "C" {
 
-    u32 __nx_applet_type = AppletType_None;
-    u32 __nx_nv_transfermem_size = 0x15000;
+    u32 __attribute__((weak)) __nx_applet_type = AppletType_None;
+    u32 __attribute__((weak)) __nx_nv_transfermem_size = 0x40000;
+    ViLayerFlags __attribute__((weak)) __nx_vi_stray_layer_flags = (ViLayerFlags)0;
 
-
-    void __appInit(void) {
-        tsl::doWithSmSession([]{
+    void __attribute__((weak)) __appInit(void) {
+        tsl::hlp::doWithSmSession([]{
             ASSERT_FATAL(hidInitialize());      // Controller inputs and Touch
             ASSERT_FATAL(plInitialize());       // Font data
             ASSERT_FATAL(pmdmntInitialize());   // PID querying
@@ -938,10 +985,12 @@ extern "C" {
         });
     }
 
-    void __appExit(void) {
+    void __attribute__((weak)) __appExit(void) {
         hidExit();
         plExit();
         pmdmntExit();
         hidsysExit();
+        setsysExit();
     }
+
 }
