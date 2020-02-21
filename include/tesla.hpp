@@ -33,6 +33,7 @@
 #include <mutex>
 #include <memory>
 #include <chrono>
+#include <map>
 
 
 // Define this makro before including tesla.hpp in your main file. If you intend
@@ -128,29 +129,6 @@ namespace tsl {
             hidsysEnableAppletToGetInput(true, 0);
         }
 
-        template<typename T>
-        std::pair<Result, T> readSetting(std::string section, std::string key) {
-            Result res;
-            u64 valueSize;
-            u64 actualSize;
-
-            T buffer;
-            std::memset(&buffer, 0x00, sizeof(buffer));
-    
-            res = setsysGetSettingsItemValueSize(section.c_str(), key.c_str(), &valueSize);
-
-            if (valueSize != sizeof(T))
-                return { 1, T() };
-
-            if (R_SUCCEEDED(res))
-                res = setsysGetSettingsItemValue(section.c_str(), key.c_str(), &buffer, valueSize, &actualSize);
-
-            if (valueSize != actualSize)
-                return { 1, T() };
-
-            return { res, buffer };
-        }
-
         std::vector<std::string> split(const std::string& str, char delim = ' ') {
             std::vector<std::string> out;
 
@@ -164,6 +142,29 @@ namespace tsl {
             out.push_back(str.substr(previous, current - previous));
 
             return out;
+        }
+
+        using IniData = std::map<std::string, std::map<std::string, std::string>>;
+
+        IniData parseIni(std::string &str) {
+            IniData iniData;
+            
+            auto lines = split(str, '\n');
+
+            std::string lastHeader = "";
+            for (auto& line : lines) {
+                line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
+
+                if (line[0] == '[' && line[line.size() - 1] == ']') {
+                    lastHeader = line.substr(1, line.size() - 2);
+                    iniData.emplace(lastHeader, std::map<std::string, std::string>{});
+                }
+                else if (auto keyValuePair = split(line, '='); keyValuePair.size() == 2) {
+                    iniData[lastHeader].emplace(keyValuePair[0], keyValuePair[1]);
+                }
+            }
+
+            return iniData;
         }
 
         u64 stringToKeyCode(std::string &value) {
@@ -1188,6 +1189,7 @@ namespace tsl {
 
             renderer.startFrame();
 
+
             this->animationLoop();
             this->getCurrentGui()->update();
             this->getCurrentGui()->draw(&renderer);
@@ -1269,9 +1271,9 @@ namespace tsl {
         struct SharedThreadData {
             bool running = false;
 
-            Event comboEvent, homeButtonPressEvent, powerButtonPressEvent;
+            Event comboEvent = { 0 }, homeButtonPressEvent = { 0 }, powerButtonPressEvent = { 0 };
 
-            u64 launchCombo = 0;
+            u64 launchCombo = KEY_L | KEY_DDOWN | KEY_RSTICK;
             bool overlayOpen = false;
 
             std::mutex dataMutex;
@@ -1282,21 +1284,23 @@ namespace tsl {
         };
 
         static void parseOverlaySettings(u64 &launchCombo) {
-            std::string launchComboString;
+            FILE *configFile = fopen("sdmc:/config/tesla/config.ini", "r");
 
-            {
-                auto [result, setting] = hlp::readSetting<std::array<char, 20>>("tesla", "launch_combo");
+            if (configFile == nullptr)
+                return;
 
-                if (R_SUCCEEDED(result))
-                    launchComboString = std::string(setting.begin(), setting.end());
-                
-                if (R_FAILED(result) || launchComboString == "")
-                    launchComboString = "L & DDOWN & RS";
-            }
+            fseek(configFile, 0, SEEK_END);
+            size_t configFileSize = ftell(configFile);
+            rewind(configFile);
 
-            launchComboString.erase(std::remove_if(launchComboString.begin(), launchComboString.end(), ::isspace), launchComboString.end());
+            std::string configFileData(configFileSize, '\0');
+            fread(&configFileData[0], sizeof(char), configFileSize, configFile);
+            fclose(configFile);
 
-            for (std::string key : hlp::split(launchComboString, '&'))
+            hlp::IniData parsedConfig = hlp::parseIni(configFileData);
+
+            launchCombo = 0x00;
+            for (std::string key : hlp::split(parsedConfig["tesla"]["key_combo"], '+'))
                 launchCombo |= hlp::stringToKeyCode(key);
         }
 
@@ -1423,7 +1427,7 @@ namespace tsl {
     static inline int loop(int argc, char** argv) {
         static_assert(std::is_base_of_v<tsl::hlp::OverlayBase, Overlay>, "tsl::loop expects a type derived from tsl::Overlay");
 
-        impl::SharedThreadData shData = { 0 };
+        impl::SharedThreadData shData;
 
         shData.running = true;
 
@@ -1448,6 +1452,7 @@ namespace tsl {
             eventWait(&shData.comboEvent, UINT64_MAX);
             eventClear(&shData.comboEvent);
             shData.overlayOpen = true;
+            
 
             hlp::requestForground(true);
 
@@ -1510,6 +1515,8 @@ extern "C" {
 
     void __appInit(void) {
         tsl::hlp::doWithSmSession([]{
+            ASSERT_FATAL(fsInitialize());
+            ASSERT_FATAL(fsdevMountSdmc());
             ASSERT_FATAL(hidInitialize());      // Controller inputs and Touch
             ASSERT_FATAL(plInitialize());       // Font data
             ASSERT_FATAL(pmdmntInitialize());   // PID querying
@@ -1519,6 +1526,7 @@ extern "C" {
     }
 
     void __appExit(void) {
+        fsExit();
         hidExit();
         plExit();
         pmdmntExit();
