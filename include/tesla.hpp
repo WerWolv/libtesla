@@ -420,32 +420,28 @@ namespace tsl {
 
                     stbtt_fontinfo *currFont = nullptr;
 
-                    if (stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter)) {
-                        currFont = &this->m_stdFont;
-                    }
-                    else if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter)) {
+                    if (stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter) || currCharacter == '\n') 
+                        currFont = &this->m_stdFont; 
+                    else if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
                         currFont = &this->m_extFont;
-                    }
-                    else return;
+                    else break;
 
                     float currFontSize = stbtt_ScaleForPixelHeight(currFont, fontSize);
-
-                    if (currCharacter == '\n') {
-                        currX = x;
-                        currY += currFontSize;
-
-                        if (i < stringLength) continue;
-                        else break;
-                    }
-
                     currX += currFontSize * stbtt_GetCodepointKernAdvance(currFont, prevCharacter, currCharacter);
 
                     int bounds[4] = { 0 };
                     stbtt_GetCodepointBitmapBoxSubpixel(currFont, currCharacter, currFontSize, currFontSize,
                                                         0, 0, &bounds[0], &bounds[1], &bounds[2], &bounds[3]);
 
-                    int xAdvance = 0;
-                    stbtt_GetCodepointHMetrics(currFont, monospace ? 'A' : currCharacter, &xAdvance, nullptr);
+                    int xAdvance = 0, yAdvance = 0;
+                    stbtt_GetCodepointHMetrics(currFont, monospace ? 'A' : currCharacter, &xAdvance, &yAdvance);
+
+                    if (currCharacter == '\n') {
+                        currX = x;
+                        currY += fontSize;
+
+                        continue;
+                    }
 
                     this->drawGlyph(currCharacter, currX + bounds[0], currY + bounds[1], color, currFont, currFontSize);
 
