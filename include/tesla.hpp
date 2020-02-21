@@ -32,11 +32,16 @@
 #include <memory>
 
 
+// Define this makro before including tesla.hpp in your main file. If you intend
+// to use the tesla.hpp header in more than one source file, only define it once!
+// #define TESLA_INIT_IMPL
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 
-#define STB_TRUETYPE_IMPLEMENTATION
-#define STBTT_STATIC
+#ifdef TESLA_INIT_IMPL
+    #define STB_TRUETYPE_IMPLEMENTATION
+#endif
 #include "stb_truetype.h"
 
 #pragma GCC diagnostic pop
@@ -61,22 +66,15 @@ namespace tsl {
         static u16 FramebufferWidth  = 0;
         static u16 FramebufferHeight = 0;
 
-        struct QuickSettingsConfig {
-            const char* title;
-            const char* subtitle;
-        };
-
-        struct DefaultOverlayConfig {
-            static inline constexpr QuickSettingsConfig QuickSettings = { .title = "Tesla Overlay", .subtitle = "v1.0.0" };
-        };
-
     }
 
     // Declarations
     enum class FocusDirection;
 
-    template <typename, typename, typename>
+    template <typename, typename>
     class Overlay;
+
+    namespace impl { enum class LaunchFlags : u8; }
 
 
     // Helpers
@@ -86,14 +84,39 @@ namespace tsl {
         template<auto> struct dependent_false : std::false_type { };
         struct OverlayBase { };
 
-        static void doWithSmSession(std::function<void()> f) {
+        void doWithSmSession(std::function<void()> f) {
             smInitialize();
             f();
             smExit();
         }
 
+        Result hidsysEnableAppletToGetInput(bool enable, u64 aruid) {  
+            const struct {
+                u8 permitInput;
+                u64 appletResourceUserId;
+            } in = { enable != 0, aruid };
+
+            return serviceDispatchIn(hidsysGetServiceSession(), 503, in);
+        }
+
+        void requestForground(bool enabled) {
+            u64 applicationAruid = 0, appletAruid = 0;
+
+            for (u64 programId = 0x0100000000001000ul; programId < 0x0100000000001020ul; programId++) {
+                pmdmntGetProcessId(&appletAruid, programId);
+                
+                if (appletAruid != 0)
+                    hidsysEnableAppletToGetInput(!enabled, appletAruid);
+            }
+
+            pmdmntGetApplicationProcessId(&applicationAruid);
+            hidsysEnableAppletToGetInput(!enabled, applicationAruid);
+
+            hidsysEnableAppletToGetInput(true, 0);
+        }
+
         template<typename T>
-        static std::pair<Result, T> readSetting(std::string section, std::string key) {
+        std::pair<Result, T> readSetting(std::string section, std::string key) {
             Result res;
             u64 valueSize;
             u64 actualSize;
@@ -115,7 +138,7 @@ namespace tsl {
             return { res, buffer };
         }
 
-        static std::vector<std::string> split(const std::string& str, char delim = ' ') {
+        std::vector<std::string> split(const std::string& str, char delim = ' ') {
             std::vector<std::string> out;
 
             std::size_t current, previous = 0;
@@ -130,7 +153,7 @@ namespace tsl {
             return out;
         }
 
-        static u64 stringToKeyCode(std::string &value) {
+        u64 stringToKeyCode(std::string &value) {
             if (strcasecmp(value.c_str(), "A")           == 0)
                 return KEY_A;
             else if (strcasecmp(value.c_str(), "B")      == 0)
@@ -195,14 +218,13 @@ namespace tsl {
         public:
             Renderer& operator=(Renderer&) = delete;
 
-            template <typename, typename>
+            template <typename>
             friend class tsl::Overlay;
 
             static Color a(const Color &c) {
                 return (c.rgba & 0x0FFF) | (static_cast<u8>(c.a * Renderer::s_opacity) << 12);
             }
 
-            template<typename OverlayConfig>
             void init() {
 
                 cfg::LayerPosX = 0;
@@ -532,12 +554,21 @@ namespace tsl {
             }
 
             virtual void draw(gfx::Renderer *renderer) = 0;
-            virtual void layout() = 0;
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) = 0;
 
             virtual void frame(gfx::Renderer *renderer) final {
                 renderer->enableScissoring(this->getX(), this->getY(), this->getWidth(), this->getHeight());
                 this->draw(renderer);
                 renderer->disableScissoring();
+            }
+
+            virtual void invalidate() final {
+                const auto& parent = this->getParent();
+
+                if (parent == nullptr)
+                    this->layout(0, 0, cfg::FramebufferWidth, cfg::FramebufferHeight);
+                else
+                    this->layout(parent->getX(), parent->getY(), parent->getWidth(), parent->getHeight());
             }
 
             virtual void drawHighlight(gfx::Renderer *renderer) {
@@ -574,8 +605,72 @@ namespace tsl {
         private:
             friend class Gui;
 
-            u16 m_x, m_y, m_width, m_height;
-            Element *m_parent;
+            u16 m_x = 0, m_y = 0, m_width = 0, m_height = 0;
+            Element *m_parent = nullptr;
+        };
+
+
+        class OverlayFrame : public Element {
+        public:
+            OverlayFrame(std::string title, std::string subtitle) : Element(), m_title(title), m_subtitle(subtitle) {}
+            ~OverlayFrame() {
+                if (this->m_contentElement != nullptr)
+                    delete this->m_contentElement;
+            }
+
+            virtual void draw(gfx::Renderer *renderer) override {
+                renderer->fillScreen({ 0x0, 0x0, 0x0, 0xD });
+
+                renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(0xFFFF));
+                renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(0xFFFF));
+
+                renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
+                renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
+
+                if (this->m_contentElement != nullptr)
+                    this->m_contentElement->frame(renderer);
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
+
+                if (this->m_contentElement != nullptr) {
+                    this->m_contentElement->setBoundaries(parentX + 30, parentY + 90, parentWidth - 60, parentHeight - 90 - 90);
+                    this->m_contentElement->invalidate();
+                }
+            }
+
+            virtual void setContent(Element *content) final {
+                if (this->m_contentElement != nullptr)
+                    delete this->m_contentElement;
+
+                this->m_contentElement = content;
+
+                if (content != nullptr) {
+                    this->m_contentElement->setParent(this);
+                    this->invalidate();
+                }
+            }
+
+        private:
+            Element *m_contentElement = nullptr;
+
+            std::string m_title, m_subtitle;
+        };
+
+        class DebugRectangle : public Element {
+        public:
+            DebugRectangle(gfx::Color color) : Element(), m_color(color) {}
+            ~DebugRectangle() {}
+
+            virtual void draw(gfx::Renderer *renderer) override {
+                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), this->m_color);
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {}
+
+        private:
+            gfx::Color m_color;
         };
 
     }
@@ -606,6 +701,11 @@ namespace tsl {
         virtual void update() {}
         virtual void onInput(u64 keysDown, u64 keysHeld, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick, touchPosition touchInput) {}
 
+        virtual void draw(gfx::Renderer *renderer) final {
+            if (this->m_topElement != nullptr)
+                this->m_topElement->draw(renderer);
+        }
+
         virtual elm::Element* getTopElement() final {
             return this->m_topElement;
         }
@@ -634,17 +734,7 @@ namespace tsl {
         elm::Element *m_topElement = nullptr;
         elm::Element *m_focusedElement = nullptr;
 
-        void drawQuickSettingsBackground(gfx::Renderer *renderer, const char *title, const char *subtitle) {
-            renderer->fillScreen({ 0x0, 0x0, 0x0, 0xD });
-
-            renderer->drawString(title, false, 20, 50, 30, a(0xFFFF));
-            renderer->drawString(subtitle, false, 20, 70, 15, a(0xFFFF));
-
-            renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
-            renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
-        }
-
-        template <typename, typename, typename>
+        template <typename, typename>
         friend class Overlay;
         friend class gfx::Renderer;
     };
@@ -652,11 +742,11 @@ namespace tsl {
 
     // Overlay
 
-    template<typename Gui, typename OverlayConfig, typename Enabled = void>
+    template<typename Gui, typename Enabled = void>
     class Overlay;
 
-    template <typename Gui, typename OverlayConfig>
-    class Overlay<Gui, OverlayConfig, std::enable_if_t<std::is_base_of_v<tsl::Gui, Gui>>> : private hlp::OverlayBase {
+    template <typename Gui>
+    class Overlay<Gui, std::enable_if_t<std::is_base_of_v<tsl::Gui, Gui>>> : private hlp::OverlayBase {
     public:
         virtual void onShow() {}    // Called before overlay wants to change from invisible to visible state
         virtual void onHide() {}    // Called before overlay wants to change from visible to invisible state
@@ -724,7 +814,7 @@ namespace tsl {
         }
 
         virtual void initScreen() final {
-            gfx::Renderer::get().init<OverlayConfig>();
+            gfx::Renderer::get().init();
         }
 
         virtual void exitScreen() final {
@@ -732,11 +822,14 @@ namespace tsl {
         }
 
         virtual void loop() final {
-            gfx::Renderer::get().startFrame();
+            auto& renderer = gfx::Renderer::get();
 
-            this->getCurrentGui()->drawQuickSettingsBackground(&gfx::Renderer::get(), OverlayConfig::QuickSettings.title, OverlayConfig::QuickSettings.subtitle);
+            renderer.startFrame();
 
-            gfx::Renderer::get().endFrame();
+            this->getCurrentGui()->update();
+            this->getCurrentGui()->draw(&renderer);
+
+            renderer.endFrame();
         }
 
         virtual void handleInput(u64 keysDown, u64 keysHeld, touchPosition touchPos, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight) final {
@@ -776,30 +869,45 @@ namespace tsl {
         }
 
         virtual void clearScreen() final {
-            gfx::Renderer::get().startFrame();
+            auto& renderer = gfx::Renderer::get();
 
-            gfx::Renderer::get().clearScreen();
-
-            gfx::Renderer::get().endFrame();
+            renderer.startFrame();
+            renderer.clearScreen();
+            renderer.endFrame();
         }
 
-        template<typename>
+        virtual void resetFlags() final {
+            this->m_shouldHide = false;
+            this->m_shouldClose = false;
+        }
+
+        template<typename, impl::LaunchFlags launchFlags>
         friend int loop(int argv, char** argc);
+
         friend class tsl::Gui;
     };
 
     
     namespace impl {
         
+        enum class LaunchFlags : u8 {
+            None = 0,
+            SkipComboInitially = BIT(0)
+        };
+
+        LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
+            return static_cast<LaunchFlags>(u8(lhs) | u8(rhs));
+        }
+
         struct SharedThreadData {
-            std::mutex dataMutex;
             bool running = false;
 
-            Event comboEvent, homeButtonPressEvent;
+            Event comboEvent, homeButtonPressEvent, powerButtonPressEvent;
 
             u64 launchCombo = 0;
             bool overlayOpen = false;
 
+            std::mutex dataMutex;
             u64 keysDown = 0;
             u64 keysHeld = 0;
             touchPosition touchPos = { 0 };
@@ -816,19 +924,23 @@ namespace tsl {
                     launchComboString = std::string(setting.begin(), setting.end());
                 
                 if (R_FAILED(result) || launchComboString == "")
-                    launchComboString = "L&DDOWN&RS";
+                    launchComboString = "L & DDOWN & RS";
             }
+
+            launchComboString.erase(std::remove_if(launchComboString.begin(), launchComboString.end(), ::isspace), launchComboString.end());
 
             for (std::string key : hlp::split(launchComboString, '&'))
                 launchCombo |= hlp::stringToKeyCode(key);
         }
 
-        template<typename Overlay>
+        template<typename Overlay, impl::LaunchFlags launchFlags>
         static void hidInputPoller(void *args) {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
             eventCreate(&shData->comboEvent, false);
-            eventFire(&shData->comboEvent);
+            
+            if constexpr (u8(launchFlags) & u8(impl::LaunchFlags::SkipComboInitially))
+                eventFire(&shData->comboEvent);
 
             // Parse Tesla settings
             impl::parseOverlaySettings(shData->launchCombo);
@@ -886,16 +998,38 @@ namespace tsl {
         }
 
         template<typename Overlay>
-        static void homeButtonPoller(void *args) {
+        static void homeButtonDetector(void *args) {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
+            // To prevent focus glitchout, close the overlay immediately when the home button gets pressed
             hidsysAcquireHomeButtonEventHandle(&shData->homeButtonPressEvent);
             eventClear(&shData->homeButtonPressEvent);
 
             while (shData->running) {
-                if (R_SUCCEEDED(eventWait(&shData->homeButtonPressEvent, 1'000'000))) {
+                if (R_SUCCEEDED(eventWait(&shData->homeButtonPressEvent, 100'000'000))) {
                     eventClear(&shData->homeButtonPressEvent);
-                    Overlay::get().hide();
+
+                    if (shData->overlayOpen)
+                        Overlay::get().hide();
+                }
+            }
+
+        }
+
+        template<typename Overlay>
+        static void powerButtonDetector(void *args) {
+            SharedThreadData *shData = static_cast<SharedThreadData*>(args);
+
+            // To prevent focus glitchout, close the overlay immediately when the power button gets pressed
+            hidsysAcquireSleepButtonEventHandle(&shData->powerButtonPressEvent);
+            eventClear(&shData->powerButtonPressEvent);
+
+            while (shData->running) {
+                if (R_SUCCEEDED(eventWait(&shData->powerButtonPressEvent, 100'000'000))) {
+                    eventClear(&shData->powerButtonPressEvent);
+
+                    if (shData->overlayOpen)
+                        Overlay::get().hide();
                 }
             }
 
@@ -905,25 +1039,26 @@ namespace tsl {
 
 
 
-    template<typename Overlay>   
+    template<typename Overlay, impl::LaunchFlags launchFlags = impl::LaunchFlags::SkipComboInitially>   
     static inline int loop(int argc, char** argv) {
         static_assert(std::is_base_of_v<tsl::hlp::OverlayBase, Overlay>, "tsl::loop expects a type derived from tsl::Overlay");
 
-        impl::SharedThreadData shData;
+        impl::SharedThreadData shData = { 0 };
 
         shData.running = true;
 
-        Thread hidPollerThread, homeButtonPollerThread;
-        threadCreate(&hidPollerThread, impl::hidInputPoller<Overlay>, &shData, nullptr, 0x1000, 0x2C, -2);
-        threadCreate(&homeButtonPollerThread, impl::homeButtonPoller<Overlay>, &shData, nullptr, 0x1000, 0x2C, -2);
+        Thread hidPollerThread, homeButtonDetectorThread, powerButtonDetectorThread;
+        threadCreate(&hidPollerThread, impl::hidInputPoller<Overlay, launchFlags>, &shData, nullptr, 0x1000, 0x2C, -2);
+        threadCreate(&homeButtonDetectorThread, impl::homeButtonDetector<Overlay>, &shData, nullptr, 0x1000, 0x2C, -2);
+        threadCreate(&powerButtonDetectorThread, impl::powerButtonDetector<Overlay>, &shData, nullptr, 0x1000, 0x2C, -2);
         threadStart(&hidPollerThread);
-        threadStart(&homeButtonPollerThread);
+        threadStart(&homeButtonDetectorThread);
+        threadStart(&powerButtonDetectorThread);
 
 
         auto& overlay = Overlay::get();
         overlay.initScreen();
         overlay.loadDefaultGui();
-
 
         while (shData.running) {
             
@@ -931,14 +1066,21 @@ namespace tsl {
             eventClear(&shData.comboEvent);
             shData.overlayOpen = true;
 
-            overlay.m_shouldHide = false;
-            overlay.onShow();
+            hlp::requestForground(true);
 
+            overlay.onShow();
             overlay.clearScreen();
 
+            shData.dataMutex.lock();
             while (shData.running) {
                 overlay.loop();
-                overlay.handleInput(shData.keysDown, shData.keysHeld, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
+
+                {
+                    shData.dataMutex.unlock();
+                    overlay.handleInput(shData.keysDown, shData.keysHeld, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
+                    shData.dataMutex.lock();
+
+                }
 
                 if (overlay.shouldHide())
                     break;
@@ -946,36 +1088,45 @@ namespace tsl {
                 if (overlay.shouldClose())
                     shData.running = false;
             }
+            shData.dataMutex.unlock();
 
             overlay.clearScreen();
+            overlay.resetFlags();
+
+            hlp::requestForground(false);
+
             shData.overlayOpen = false;
             eventClear(&shData.comboEvent);
         }
 
         eventClose(&shData.homeButtonPressEvent);
+        eventClose(&shData.powerButtonPressEvent);
         eventClose(&shData.comboEvent);
 
         threadWaitForExit(&hidPollerThread);
         threadClose(&hidPollerThread);
-        threadWaitForExit(&homeButtonPollerThread);
-        threadClose(&homeButtonPollerThread);
+        threadWaitForExit(&homeButtonDetectorThread);
+        threadClose(&homeButtonDetectorThread);
+        threadWaitForExit(&powerButtonDetectorThread);
+        threadClose(&powerButtonDetectorThread);
 
         overlay.exitScreen();
-
-        envSetNextLoad("", "--initial-load");
         
         return 0;
     }
 
 }
 
+
+#ifdef TESLA_INIT_IMPL
+
 extern "C" {
 
-    u32 __attribute__((weak)) __nx_applet_type = AppletType_None;
-    u32 __attribute__((weak)) __nx_nv_transfermem_size = 0x40000;
-    ViLayerFlags __attribute__((weak)) __nx_vi_stray_layer_flags = (ViLayerFlags)0;
+    u32 __nx_applet_type = AppletType_None;
+    u32  __nx_nv_transfermem_size = 0x40000;
+    ViLayerFlags __nx_vi_stray_layer_flags = (ViLayerFlags)0;
 
-    void __attribute__((weak)) __appInit(void) {
+    void __appInit(void) {
         tsl::hlp::doWithSmSession([]{
             ASSERT_FATAL(hidInitialize());      // Controller inputs and Touch
             ASSERT_FATAL(plInitialize());       // Font data
@@ -985,7 +1136,7 @@ extern "C" {
         });
     }
 
-    void __attribute__((weak)) __appExit(void) {
+    void __appExit(void) {
         hidExit();
         plExit();
         pmdmntExit();
@@ -994,3 +1145,5 @@ extern "C" {
     }
 
 }
+
+#endif
