@@ -815,7 +815,8 @@ namespace tsl {
 
         class ListItem : public Element {
         public:
-            ListItem(std::string text) : Element(), m_text(text) {}
+            ListItem(std::string text, std::function<void()> onSelect) : Element(), m_text(text), m_onSelect(onSelect) {}
+            ListItem(std::string text) : ListItem(text, nullptr) {}
             ~ListItem() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
@@ -851,35 +852,41 @@ namespace tsl {
                 this->m_valueWidth = 0;
             }
 
+            virtual bool onClick(u64 keys) override {
+                return (keys & KEY_A) && handleSelect();
+            }
+
+        protected:
+            virtual inline bool handleSelect() {
+                if (m_onSelect != nullptr) {
+                    m_onSelect();
+                    return true;
+                }
+                return false;
+            }
+
         private:
             std::string m_text;
             std::string m_value = "";
             bool m_faint = false;
-
             u16 m_valueWidth = 0;
+            std::function<void()> m_onSelect;
         };
 
 
         class ToggleListItem : public ListItem {
         public:
             ToggleListItem(std::string text, bool initialState, std::string onValue = "On", std::string offValue = "Off")
-                : ListItem(text), m_state(initialState), m_onValue(onValue), m_offValue(offValue) {
+                : ListItem(text, [this]() { this->toggleState(); })
+                , m_state(initialState), m_onValue(onValue), m_offValue(offValue) {
                 
                 this->setState(this->m_state);
             }
 
             ~ToggleListItem() {}
 
-            virtual bool onClick(u64 keys) {
-                if (keys & KEY_A) {
-                    this->m_state = !this->m_state;
-
-                    this->setState(this->m_state);
-
-                    return true;
-                }
-
-                return false;
+            virtual void toggleState() {
+                this->setState(!this->m_state);
             }
 
             virtual inline bool getState() final {
@@ -887,6 +894,7 @@ namespace tsl {
             }
 
             virtual inline void setState(bool state) final {
+                this->m_state = state;
                 if (state)
                     this->setValue(this->m_onValue, false);
                 else
