@@ -74,6 +74,10 @@ namespace tsl {
 
     }
 
+    namespace style {
+        constexpr u32 ListItemDefaultHeight = 72;
+    }
+
     // Declarations
     enum class FocusDirection {
         None,
@@ -920,7 +924,12 @@ namespace tsl {
                 }
             }
 
-            virtual void addItem(Element *element, u16 height) final {
+            virtual void addItem(Element *element, u16 height = 0) final {
+                if (height == 0) {
+                    if (dynamic_cast<ListItem*>(element) != nullptr)
+                        height = tsl::style::ListItemDefaultHeight;
+                }
+
                 if (element != nullptr && height > 0) {
                     element->setParent(this);
                     this->m_items.push_back({ element, height });
@@ -1016,12 +1025,11 @@ namespace tsl {
                 delete this->m_topElement;
         }
 
-        virtual void initServices() {}
-        virtual void exitServices() {}
-
         virtual elm::Element* createUI() = 0;
         virtual void update() {}
-        virtual void onInput(u64 keysDown, u64 keysHeld, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick, touchPosition touchInput) {}
+        virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) {
+            return false;
+        }
 
         virtual void draw(gfx::Renderer *renderer) final {
             if (this->m_topElement != nullptr)
@@ -1080,8 +1088,11 @@ namespace tsl {
     template <typename Gui>
     class Overlay<Gui, std::enable_if_t<std::is_base_of_v<tsl::Gui, Gui>>> : private hlp::OverlayBase {
     public:
-        virtual void onShow() {}    // Called before overlay wants to change from invisible to visible state
-        virtual void onHide() {}    // Called before overlay wants to change from visible to invisible state
+        virtual void initServices() {}  // Called at the start to initialize all services necessary for this Overlay
+        virtual void exitServices() {}  // Callet at the end to clean up all services previously initialized
+
+        virtual void onShow() {}        // Called before overlay wants to change from invisible to visible state
+        virtual void onHide() {}        // Called before overlay wants to change from visible to invisible state
 
         virtual std::unique_ptr<tsl::Gui>& getCurrentGui() final {
             return this->m_guiStack[this->m_guiStack.size() - 1];
@@ -1234,6 +1245,8 @@ namespace tsl {
                 handled = parentElement->onClick(keysDown);
                 parentElement = parentElement->getParent();
             } while (!handled && parentElement != nullptr);
+
+            handled = handled | currentGui->handleInput(keysDown, keysHeld, touchPos, joyStickPosLeft, joyStickPosRight);
 
             if (!handled) {
                 if (keysDown & KEY_UP)
@@ -1457,6 +1470,7 @@ namespace tsl {
 
 
         auto& overlay = Overlay::get();
+        overlay.initServices();
         overlay.initScreen();
         overlay.loadDefaultGui();
 
@@ -1514,6 +1528,7 @@ namespace tsl {
         threadClose(&powerButtonDetectorThread);
 
         overlay.exitScreen();
+        overlay.exitServices();
         
         return 0;
     }
