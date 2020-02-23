@@ -23,6 +23,7 @@
 
 #include <stdlib.h>
 #include <strings.h>
+#include <math.h>
 
 #include <algorithm>
 #include <cstring>
@@ -65,12 +66,12 @@ namespace tsl {
         constexpr u32 ScreenWidth = 1920;
         constexpr u32 ScreenHeight = 1080;
 
-        static u16 LayerWidth  = 0;
-        static u16 LayerHeight = 0;
-        static u16 LayerPosX   = 0;
-        static u16 LayerPosY   = 0;
-        static u16 FramebufferWidth  = 0;
-        static u16 FramebufferHeight = 0;
+        extern u16 LayerWidth;
+        extern u16 LayerHeight;
+        extern u16 LayerPosX;
+        extern u16 LayerPosY;
+        extern u16 FramebufferWidth;
+        extern u16 FramebufferHeight;
 
     }
 
@@ -102,13 +103,13 @@ namespace tsl {
         template<auto> struct dependent_false : std::false_type { };
         struct OverlayBase { };
 
-        void doWithSmSession(std::function<void()> f) {
+        static void doWithSmSession(std::function<void()> f) {
             smInitialize();
             f();
             smExit();
         }
 
-        Result hidsysEnableAppletToGetInput(bool enable, u64 aruid) {  
+        static Result hidsysEnableAppletToGetInput(bool enable, u64 aruid) {  
             const struct {
                 u8 permitInput;
                 u64 appletResourceUserId;
@@ -117,7 +118,7 @@ namespace tsl {
             return serviceDispatchIn(hidsysGetServiceSession(), 503, in);
         }
 
-        void requestForground(bool enabled) {
+        static void requestForground(bool enabled) {
             u64 applicationAruid = 0, appletAruid = 0;
 
             for (u64 programId = 0x0100000000001000ul; programId < 0x0100000000001020ul; programId++) {
@@ -133,7 +134,7 @@ namespace tsl {
             hidsysEnableAppletToGetInput(true, 0);
         }
 
-        std::vector<std::string> split(const std::string& str, char delim = ' ') {
+        static std::vector<std::string> split(const std::string& str, char delim = ' ') {
             std::vector<std::string> out;
 
             std::size_t current, previous = 0;
@@ -150,7 +151,7 @@ namespace tsl {
 
         using IniData = std::map<std::string, std::map<std::string, std::string>>;
 
-        IniData parseIni(std::string &str) {
+        static IniData parseIni(std::string &str) {
             IniData iniData;
             
             auto lines = split(str, '\n');
@@ -171,7 +172,7 @@ namespace tsl {
             return iniData;
         }
 
-        u64 stringToKeyCode(std::string &value) {
+        static u64 stringToKeyCode(std::string &value) {
             if (strcasecmp(value.c_str(), "A")           == 0)
                 return KEY_A;
             else if (strcasecmp(value.c_str(), "B")      == 0)
@@ -1296,7 +1297,7 @@ namespace tsl {
             SkipComboInitially = BIT(0)
         };
 
-        LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
+        static LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
             return static_cast<LaunchFlags>(u8(lhs) | u8(rhs));
         }
 
@@ -1540,6 +1541,15 @@ namespace tsl {
 
 
 #ifdef TESLA_INIT_IMPL
+
+namespace tsl::cfg {
+    u16 LayerWidth  = 0;
+    u16 LayerHeight = 0;
+    u16 LayerPosX   = 0;
+    u16 LayerPosY   = 0;
+    u16 FramebufferWidth  = 0;
+    u16 FramebufferHeight = 0;
+}
 
 extern "C" {
 
