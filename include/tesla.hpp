@@ -118,7 +118,7 @@ namespace tsl {
             return serviceDispatchIn(hidsysGetServiceSession(), 503, in);
         }
 
-        static void requestForground(bool enabled) {
+        static void requestForeground(bool enabled) {
             u64 applicationAruid = 0, appletAruid = 0;
 
             for (u64 programId = 0x0100000000001000ul; programId < 0x0100000000001020ul; programId++) {
@@ -1488,7 +1488,7 @@ namespace tsl {
             shData.overlayOpen = true;
             
 
-            hlp::requestForground(true);
+            hlp::requestForeground(true);
 
             overlay.show();
             overlay.clearScreen();
@@ -1514,7 +1514,7 @@ namespace tsl {
             overlay.clearScreen();
             overlay.resetFlags();
 
-            hlp::requestForground(false);
+            hlp::requestForeground(false);
 
             shData.overlayOpen = false;
             eventClear(&shData.comboEvent);
