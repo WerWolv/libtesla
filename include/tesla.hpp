@@ -770,7 +770,10 @@ namespace tsl {
             }
 
             virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
-                return this->m_contentElement->requestFocus(oldFocus, direction);
+                if (this->m_contentElement != nullptr)
+                    return this->m_contentElement->requestFocus(oldFocus, direction);
+                else
+                    return nullptr;
             }
 
             virtual void setContent(Element *content) final {
