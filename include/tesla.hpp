@@ -103,7 +103,7 @@ namespace tsl {
         template<auto> struct dependent_false : std::false_type { };
         struct OverlayBase { };
 
-        static void doWithSmSession(std::function<void()> f) {
+        static inline void doWithSmSession(std::function<void()> f) {
             smInitialize();
             f();
             smExit();
@@ -302,7 +302,7 @@ namespace tsl {
                 this->m_currentFramebuffer = nullptr;
             }
 
-            void enableScissoring(u16 x, u16 y, u16 w, u16 h) {
+            inline void enableScissoring(u16 x, u16 y, u16 w, u16 h) {
                 this->m_scissoring = true;
 
                 this->m_scissorBounds[0] = x;
@@ -311,7 +311,7 @@ namespace tsl {
                 this->m_scissorBounds[3] = h;
             }
 
-            void disableScissoring() {
+            inline void disableScissoring() {
                 this->m_scissoring = false;
             }
 
@@ -376,50 +376,7 @@ namespace tsl {
                 this->fillScreen({ 0x00, 0x00, 0x00, 0x00 });
             }
 
-
-            inline Result initFonts() {
-                Result res;
-
-                static PlFontData stdFontData, extFontData;
-
-                // Nintendo's default font
-                if(R_FAILED(res = plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard)))
-                    return res;
-
-                u8 *fontBuffer = reinterpret_cast<u8*>(stdFontData.address);
-                stbtt_InitFont(&this->m_stdFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
-                
-                // Nintendo's extended font containing a bunch of icons
-                if(R_FAILED(res = plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt)))
-                    return res;
-
-                fontBuffer = reinterpret_cast<u8*>(extFontData.address);
-                stbtt_InitFont(&this->m_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
-
-                return res;
-            }
-
-            inline void drawGlyph(s32 codepoint, u32 x, u32 y, Color color, stbtt_fontinfo *font, float fontSize) {
-                int width = 10, height = 10;
-
-                u8 *glyphBmp = stbtt_GetCodepointBitmap(font, fontSize, fontSize, codepoint, &width, &height, nullptr, nullptr);
-                
-                if (glyphBmp == nullptr)
-                    return;
-
-                for (s16 bmpY = 0; bmpY < height; bmpY++) {
-                    for (s16 bmpX = 0; bmpX < width; bmpX++) {
-                        Color tmpColor = color;
-                        tmpColor.a = (glyphBmp[width * bmpY + bmpX] >> 4) * (float(tmpColor.a) / 0xF);
-                        this->setPixelBlendSrc(x + bmpX, y + bmpY, tmpColor);
-                    }
-                }
-
-                std::free(glyphBmp);
-
-            }
-
-            inline std::pair<u32, u32> getStringBounds(const char* string, bool monospace, float fontSize) {
+            std::pair<u32, u32> getStringBounds(const char* string, bool monospace, float fontSize) {
                 const size_t stringLength = strlen(string);
 
                 u32 maxX = 0;
@@ -472,7 +429,7 @@ namespace tsl {
                 return { maxX, currY }; 
             }
 
-            inline void drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color) {
+            void drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color) {
                 const size_t stringLength = strlen(string);
 
                 u32 currX = x;
@@ -554,35 +511,35 @@ namespace tsl {
             static inline float s_opacity = 1.0F;
 
                     
-            void* getCurrentFramebuffer() {
+            inline void* getCurrentFramebuffer() {
                 return this->m_currentFramebuffer;
             }
 
-            void* getNextFramebuffer() {
+            inline void* getNextFramebuffer() {
                 return static_cast<u8*>(this->m_framebuffer.buf) + this->getNextFramebufferSlot() * this->getFramebufferSize();
             }
 
-            size_t getFramebufferSize() {
+            inline size_t getFramebufferSize() {
                 return this->m_framebuffer.fb_size;
             }
 
-            size_t getFramebufferCount() {
+            inline size_t getFramebufferCount() {
                 return this->m_framebuffer.num_fbs;
             }
 
-            u8 getCurrentFramebufferSlot() {
+            inline u8 getCurrentFramebufferSlot() {
                 return this->m_window.cur_slot;
             }
 
-            u8 getNextFramebufferSlot() {
+            inline u8 getNextFramebufferSlot() {
                 return (this->getCurrentFramebufferSlot() + 1) % this->getFramebufferCount();
             }
 
-            void waitForVSync() {
+            inline void waitForVSync() {
                 eventWait(&this->m_vsyncEvent, UINT64_MAX);
             }
 
-            inline const u32 getPixelOffset(u32 x, u32 y) {
+            const u32 getPixelOffset(u32 x, u32 y) {
                 if (this->m_scissoring) {
                     if (x < this->m_scissorBounds[0] ||
                         y < this->m_scissorBounds[1] ||
@@ -597,6 +554,48 @@ namespace tsl {
                 tmpPos += ((y % 16) / 8) * 512 + ((x % 32) / 16) * 256 + ((y % 8) / 2) * 64 + ((x % 16) / 8) * 32 + (y % 2) * 16 + (x % 8) * 2;
                 
                 return tmpPos / 2;
+            }
+
+            Result initFonts() {
+                Result res;
+
+                static PlFontData stdFontData, extFontData;
+
+                // Nintendo's default font
+                if(R_FAILED(res = plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard)))
+                    return res;
+
+                u8 *fontBuffer = reinterpret_cast<u8*>(stdFontData.address);
+                stbtt_InitFont(&this->m_stdFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+                
+                // Nintendo's extended font containing a bunch of icons
+                if(R_FAILED(res = plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt)))
+                    return res;
+
+                fontBuffer = reinterpret_cast<u8*>(extFontData.address);
+                stbtt_InitFont(&this->m_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+
+                return res;
+            }
+
+            inline void drawGlyph(s32 codepoint, u32 x, u32 y, Color color, stbtt_fontinfo *font, float fontSize) {
+                int width = 10, height = 10;
+
+                u8 *glyphBmp = stbtt_GetCodepointBitmap(font, fontSize, fontSize, codepoint, &width, &height, nullptr, nullptr);
+                
+                if (glyphBmp == nullptr)
+                    return;
+
+                for (s16 bmpY = 0; bmpY < height; bmpY++) {
+                    for (s16 bmpX = 0; bmpX < width; bmpX++) {
+                        Color tmpColor = color;
+                        tmpColor.a = (glyphBmp[width * bmpY + bmpX] >> 4) * (float(tmpColor.a) / 0xF);
+                        this->setPixelBlendSrc(x + bmpX, y + bmpY, tmpColor);
+                    }
+                }
+
+                std::free(glyphBmp);
+
             }
         };
 
@@ -704,15 +703,15 @@ namespace tsl {
                 this->m_height = height;
             }
 
-            virtual u16 getX() final { return this->m_x; }
-            virtual u16 getY() final { return this->m_y; }
-            virtual u16 getWidth()  final { return this->m_width;  }
-            virtual u16 getHeight() final { return this->m_height; }
+            virtual inline u16 getX() final { return this->m_x; }
+            virtual inline u16 getY() final { return this->m_y; }
+            virtual inline u16 getWidth()  final { return this->m_width;  }
+            virtual inline u16 getHeight() final { return this->m_height; }
 
-            virtual void setParent(Element *parent) final { this->m_parent = parent; }
-            virtual Element* getParent() final { return this->m_parent; }
+            virtual inline void setParent(Element *parent) final { this->m_parent = parent; }
+            virtual inline Element* getParent() final { return this->m_parent; }
 
-            virtual void setFocused(bool focused) { this->m_focused = focused; }
+            virtual inline void setFocused(bool focused) { this->m_focused = focused; }
 
         protected:
             constexpr static inline auto a = &gfx::Renderer::a;
@@ -840,11 +839,11 @@ namespace tsl {
             }
 
 
-            virtual void setText(std::string text) final { 
+            virtual inline void setText(std::string text) final { 
                 this->m_text = text;
             }
 
-            virtual void setValue(std::string value, bool faint = false) final { 
+            virtual inline void setValue(std::string value, bool faint = false) final { 
                 this->m_value = value;
                 this->m_faint = faint;
                 this->m_valueWidth = 0;
@@ -881,11 +880,11 @@ namespace tsl {
                 return false;
             }
 
-            virtual bool getState() final {
+            virtual inline bool getState() final {
                 return this->m_state;
             }
 
-            virtual void setState(bool state) final {
+            virtual inline void setState(bool state) final {
                 if (state)
                     this->setValue(this->m_onValue, false);
                 else
