@@ -77,6 +77,10 @@ namespace tsl {
 
     namespace style {
         constexpr u32 ListItemDefaultHeight = 72;
+
+        namespace color {
+            constexpr Color ColorTransparent = { 0, 0, 0, 0 };
+        }
     }
 
     // Declarations
@@ -319,62 +323,10 @@ namespace tsl {
                 this->fillScreen({ 0x00, 0x00, 0x00, 0x00 });
             }
 
-            std::pair<u32, u32> getStringBounds(const char* string, bool monospace, float fontSize) {
+            std::pair<u32, u32> drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color) {
                 const size_t stringLength = strlen(string);
 
-                u32 maxX = 0;
-
-                u32 currX = 0;
-                u32 currY = 0;
-                u32 prevCharacter = 0;
-
-                u32 i = 0;
-
-                do {
-                    u32 currCharacter;
-                    ssize_t codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(string + i));
-
-                    if (codepointWidth <= 0)
-                        break;
-
-                    i += codepointWidth;
-
-                    stbtt_fontinfo *currFont = nullptr;
-
-                    if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
-                        currFont = &this->m_extFont;
-                    else
-                        currFont = &this->m_stdFont;
-
-                    float currFontSize = stbtt_ScaleForPixelHeight(currFont, fontSize);
-                    currX += currFontSize * stbtt_GetCodepointKernAdvance(currFont, prevCharacter, currCharacter);
-
-                    int xAdvance = 0;
-                    stbtt_GetCodepointHMetrics(currFont, monospace ? 'A' : currCharacter, &xAdvance, nullptr);
-
-                    if (currCharacter == '\n') {
-                        if (currX > maxX)
-                            maxX = currX;
-
-                        currX = 0;
-                        currY += fontSize;
-
-                        continue;
-                    }
-
-                    currX += xAdvance * currFontSize;
-                    
-                } while (i < stringLength);
-
-                if (currX > maxX)
-                    maxX = currX;
-
-                return { maxX, currY }; 
-            }
-
-            void drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color) {
-                const size_t stringLength = strlen(string);
-
+                u32 maxX = x;
                 u32 currX = x;
                 u32 currY = y;
                 u32 prevCharacter = 0;
@@ -405,21 +357,27 @@ namespace tsl {
                                                         0, 0, &bounds[0], &bounds[1], &bounds[2], &bounds[3]);
 
                     int xAdvance = 0, yAdvance = 0;
-                    stbtt_GetCodepointHMetrics(currFont, monospace ? 'A' : currCharacter, &xAdvance, &yAdvance);
+                    stbtt_GetCodepointHMetrics(currFont, monospace ? 'W' : currCharacter, &xAdvance, &yAdvance);
 
                     if (currCharacter == '\n') {
+                        maxX = std::max(currX, maxX);
+
                         currX = x;
                         currY += fontSize;
 
                         continue;
                     }
 
-                   if (!std::iswspace(currCharacter))
+                   if (!std::iswspace(currCharacter) && fontSize > 0 && color.a != 0x0)
                         this->drawGlyph(currCharacter, currX + bounds[0], currY + bounds[1], color, currFont, currFontSize);
 
                     currX += xAdvance * currFontSize;
                     
                 } while (i < stringLength);
+
+                maxX = std::max(currX, maxX);
+
+                return { maxX - x, currY - y };
             }
             
         private:
