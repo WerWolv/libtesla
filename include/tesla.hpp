@@ -1150,9 +1150,9 @@ namespace tsl {
         Overlay() {}                // Called once when overlay gets loaded
         virtual ~Overlay() {}       // Called once before overlay exits and 
 
-        template<typename G>
-        std::unique_ptr<tsl::Gui>& changeTo() {
-            auto newGui = std::make_unique<G>();
+        template<typename G, typename ...Args>
+        std::unique_ptr<tsl::Gui>& changeTo(Args&&... args) {
+            auto newGui = std::make_unique<G>(std::forward<Args>(args)...);
             newGui->m_topElement = newGui->createUI();
             newGui->requestFocus(newGui->m_topElement, FocusDirection::None);
 
