@@ -244,63 +244,6 @@ namespace tsl {
                 return (c.rgba & 0x0FFF) | (static_cast<u8>(c.a * Renderer::s_opacity) << 12);
             }
 
-            void init() {
-
-                cfg::LayerPosX = 0;
-                cfg::LayerPosY = 0;
-                cfg::FramebufferWidth  = 448;
-                cfg::FramebufferHeight = 720;
-                cfg::LayerWidth  = cfg::ScreenHeight * (float(cfg::FramebufferWidth) / float(cfg::FramebufferHeight));
-                cfg::LayerHeight = cfg::ScreenHeight;
-
-                if (this->m_initialized)
-                    return;
-
-                tsl::hlp::doWithSmSession([this]{
-                    ASSERT_FATAL(viInitialize(ViServiceType_Manager));
-                    ASSERT_FATAL(viOpenDefaultDisplay(&this->m_display));
-                    ASSERT_FATAL(viGetDisplayVsyncEvent(&this->m_display, &this->m_vsyncEvent));
-                    ASSERT_FATAL(viCreateManagedLayer(&this->m_display, static_cast<ViLayerFlags>(0), 0, &__nx_vi_layer_id));
-                    ASSERT_FATAL(viCreateLayer(&this->m_display, &this->m_layer));
-                    ASSERT_FATAL(viSetLayerScalingMode(&this->m_layer, ViScalingMode_PreserveAspectRatio));
-
-                    if (s32 layerZ = 0; R_SUCCEEDED(viGetZOrderCountMax(&this->m_display, &layerZ)) && layerZ > 0)
-                        ASSERT_FATAL(viSetLayerZ(&this->m_layer, layerZ));
-
-                    ASSERT_FATAL(viSetLayerSize(&this->m_layer, cfg::LayerWidth, cfg::LayerHeight));
-                    ASSERT_FATAL(viSetLayerPosition(&this->m_layer, cfg::LayerPosX, cfg::LayerPosY));
-                    ASSERT_FATAL(nwindowCreateFromLayer(&this->m_window, &this->m_layer));
-                    ASSERT_FATAL(framebufferCreate(&this->m_framebuffer, &this->m_window, cfg::FramebufferWidth, cfg::FramebufferHeight, PIXEL_FORMAT_RGBA_4444, 2));
-                    ASSERT_FATAL(this->initFonts());
-                });
-
-                this->m_initialized = true;
-            }
-
-            void exit() {
-                if (!this->m_initialized)
-                    return;
-
-                ViLayer layerCopy = this->m_layer;
-
-                framebufferClose(&this->m_framebuffer);
-                nwindowClose(&this->m_window);
-                viCloseLayer(&this->m_layer);
-                viDestroyManagedLayer(&layerCopy); // Copy is required because viCloseLayer wipes the passed layer object
-                viExit();
-            }
-
-            void startFrame() {
-                this->m_currentFramebuffer = framebufferBegin(&this->m_framebuffer, nullptr);
-            }
-
-            void endFrame() {
-                std::memcpy(this->getNextFramebuffer(), this->getCurrentFramebuffer(), this->getFramebufferSize());
-                this->waitForVSync();
-                framebufferEnd(&this->m_framebuffer);
-
-                this->m_currentFramebuffer = nullptr;
-            }
 
             inline void enableScissoring(u16 x, u16 y, u16 w, u16 h) {
                 this->m_scissoring = true;
@@ -556,6 +499,52 @@ namespace tsl {
                 return tmpPos / 2;
             }
 
+            void init() {
+
+                cfg::LayerPosX = 0;
+                cfg::LayerPosY = 0;
+                cfg::FramebufferWidth  = 448;
+                cfg::FramebufferHeight = 720;
+                cfg::LayerWidth  = cfg::ScreenHeight * (float(cfg::FramebufferWidth) / float(cfg::FramebufferHeight));
+                cfg::LayerHeight = cfg::ScreenHeight;
+
+                if (this->m_initialized)
+                    return;
+
+                tsl::hlp::doWithSmSession([this]{
+                    ASSERT_FATAL(viInitialize(ViServiceType_Manager));
+                    ASSERT_FATAL(viOpenDefaultDisplay(&this->m_display));
+                    ASSERT_FATAL(viGetDisplayVsyncEvent(&this->m_display, &this->m_vsyncEvent));
+                    ASSERT_FATAL(viCreateManagedLayer(&this->m_display, static_cast<ViLayerFlags>(0), 0, &__nx_vi_layer_id));
+                    ASSERT_FATAL(viCreateLayer(&this->m_display, &this->m_layer));
+                    ASSERT_FATAL(viSetLayerScalingMode(&this->m_layer, ViScalingMode_PreserveAspectRatio));
+
+                    if (s32 layerZ = 0; R_SUCCEEDED(viGetZOrderCountMax(&this->m_display, &layerZ)) && layerZ > 0)
+                        ASSERT_FATAL(viSetLayerZ(&this->m_layer, layerZ));
+
+                    ASSERT_FATAL(viSetLayerSize(&this->m_layer, cfg::LayerWidth, cfg::LayerHeight));
+                    ASSERT_FATAL(viSetLayerPosition(&this->m_layer, cfg::LayerPosX, cfg::LayerPosY));
+                    ASSERT_FATAL(nwindowCreateFromLayer(&this->m_window, &this->m_layer));
+                    ASSERT_FATAL(framebufferCreate(&this->m_framebuffer, &this->m_window, cfg::FramebufferWidth, cfg::FramebufferHeight, PIXEL_FORMAT_RGBA_4444, 2));
+                    ASSERT_FATAL(this->initFonts());
+                });
+
+                this->m_initialized = true;
+            }
+
+            void exit() {
+                if (!this->m_initialized)
+                    return;
+
+                ViLayer layerCopy = this->m_layer;
+
+                framebufferClose(&this->m_framebuffer);
+                nwindowClose(&this->m_window);
+                viCloseLayer(&this->m_layer);
+                viDestroyManagedLayer(&layerCopy); // Copy is required because viCloseLayer wipes the passed layer object
+                viExit();
+            }
+
             Result initFonts() {
                 Result res;
 
@@ -577,6 +566,19 @@ namespace tsl {
 
                 return res;
             }
+            
+            inline void startFrame() {
+                this->m_currentFramebuffer = framebufferBegin(&this->m_framebuffer, nullptr);
+            }
+
+            inline void endFrame() {
+                std::memcpy(this->getNextFramebuffer(), this->getCurrentFramebuffer(), this->getFramebufferSize());
+                this->waitForVSync();
+                framebufferEnd(&this->m_framebuffer);
+
+                this->m_currentFramebuffer = nullptr;
+            }
+
 
             inline void drawGlyph(s32 codepoint, u32 x, u32 y, Color color, stbtt_fontinfo *font, float fontSize) {
                 int width = 10, height = 10;
@@ -1296,7 +1298,7 @@ namespace tsl {
             SkipComboInitially = BIT(0)
         };
 
-        static LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
+        [[maybe_unused]] static LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
             return static_cast<LaunchFlags>(u8(lhs) | u8(rhs));
         }
 
