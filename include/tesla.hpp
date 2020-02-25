@@ -79,7 +79,7 @@ namespace tsl {
         constexpr u32 ListItemDefaultHeight = 72;
 
         namespace color {
-            constexpr Color ColorTransparent = { 0, 0, 0, 0 };
+            constexpr u16 ColorTransparent = 0xFFFF;
         }
     }
 
@@ -778,7 +778,7 @@ namespace tsl {
 
             virtual void draw(gfx::Renderer *renderer) override {
                 if (this->m_valueWidth == 0) {
-                    auto [width, height] = renderer->getStringBounds(this->m_value.c_str(), false, 20);
+                    auto [width, height] = renderer->drawString(this->m_value.c_str(), false, 0, 0, 20, tsl::style::color::ColorTransparent);
                     this->m_valueWidth = width;
                 }
 
