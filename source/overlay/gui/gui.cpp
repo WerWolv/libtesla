@@ -24,6 +24,9 @@
 #include "overlay/overlay.hpp"
 
 namespace tsl {
+	
+	u32 divr = 1;
+	u32 FPS = 1000 / divr;
 
     Gui::Gui() {
         Gui::s_screen->clear();
@@ -34,6 +37,11 @@ namespace tsl {
     Gui::~Gui() {
 
     }
+	
+	void Gui::divir(u32 div) {
+		divr = div;
+		FPS = 1000 / divr;
+	}
 
     void Gui::init(Screen *screen) {
         Gui::s_screen = screen;
@@ -108,7 +116,7 @@ namespace tsl {
         }  
 
         // Make sure we run at a maximum of 1FPS
-        std::this_thread::sleep_for(1000ms - (frameStartTime - std::chrono::steady_clock::now()));
+        std::this_thread::sleep_for(std::chrono::milliseconds(FPS) - (frameStartTime - std::chrono::steady_clock::now()));
 
         Gui::s_lastFrameDuration = std::chrono::steady_clock::now() - frameStartTime;
     }

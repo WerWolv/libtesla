@@ -39,6 +39,8 @@ namespace tsl {
     public:
         Gui();
         virtual ~Gui();
+		
+		static void divir(u32 div);
 
         void setTitle(std::string title) { this->m_title = title; }
         void setSubtitle(std::string subtitle) { this->m_subtitle = subtitle; }
@@ -59,7 +61,7 @@ namespace tsl {
             screen->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, tsl::a(0xFFFF));
 
             screen->drawRect(15, 720 - 73, FB_WIDTH - 30, 1, a(0xFFFF));
-            screen->drawString("Hold Left Stick and Right Stick to Exit", false, 30, 693, 15, a(0xFFFF));
+            screen->drawString("Hold Left Stick and Right Stick to Exit", false, 20, 670, 15, a(0xFFFF));
         } 
 
         virtual void postDraw(Screen *screen) {} 
