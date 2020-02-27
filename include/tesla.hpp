@@ -575,7 +575,7 @@ namespace tsl {
             }
 
             virtual bool onClick(u64 keys) {
-                return false;
+                return m_clickListener(keys);
             }
 
             virtual bool onTouch(u32 x, u32 y) {
@@ -663,6 +663,10 @@ namespace tsl {
                 this->m_height = height;
             }
 
+            virtual void setClickListener(std::function<bool(u64 keys)> clickListener) {
+                this->m_clickListener = clickListener;
+            }
+
             virtual inline u16 getX() final { return this->m_x; }
             virtual inline u16 getY() final { return this->m_y; }
             virtual inline u16 getWidth()  final { return this->m_width;  }
@@ -682,6 +686,8 @@ namespace tsl {
             u16 m_x = 0, m_y = 0, m_width = 0, m_height = 0;
             Element *m_parent = nullptr;
             bool m_focused = false;
+
+            std::function<bool(u64 keys)> m_clickListener = [](u64) { return false; };
 
             // Highlight shake animation
             bool m_highlightShaking = false;
@@ -748,7 +754,7 @@ namespace tsl {
                 }
             }
 
-        private:
+        protected:
             Element *m_contentElement = nullptr;
 
             std::string m_title, m_subtitle;
@@ -803,13 +809,13 @@ namespace tsl {
                 this->m_text = text;
             }
 
-            virtual inline void setValue(std::string value, bool faint = false) final { 
+            virtual inline void setValue(std::string value, bool faint = false) { 
                 this->m_value = value;
                 this->m_faint = faint;
                 this->m_valueWidth = 0;
             }
 
-        private:
+        protected:
             std::string m_text;
             std::string m_value = "";
             bool m_faint = false;
@@ -840,20 +846,30 @@ namespace tsl {
                 return false;
             }
 
-            virtual inline bool getState() final {
+            virtual inline bool getState() {
                 return this->m_state;
             }
 
-            virtual inline void setState(bool state) final {
+            virtual void setState(bool state) {
+                this->m_state = state;
+
                 if (state)
                     this->setValue(this->m_onValue, false);
                 else
                     this->setValue(this->m_offValue, true);
+
+                this->m_stateChangedListener(state);
             }
 
-        private:
+            void setStateChangedListener(std::function<void(bool)> stateChangedListener) {
+                this->m_stateChangedListener = stateChangedListener;
+            } 
+
+        protected:
             bool m_state = true;
             std::string m_onValue, m_offValue;
+
+            std::function<void(bool)> m_stateChangedListener = [](bool){};
         };
 
 
@@ -941,24 +957,7 @@ namespace tsl {
                 return it->element;
             }
 
-
-            class CustomDrawer : public Element {
-            public:
-                CustomDrawer(std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> renderFunc) : Element(), m_renderFunc(renderFunc) {}
-                ~CustomDrawer() {}
-
-                virtual void draw(gfx::Renderer* renderer) override {
-                    this->m_renderFunc(renderer, this->getX(), this->getY(), this->getWidth(), this->getHeight());
-                }
-
-                virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {}
-
-            private:
-                std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> m_renderFunc;
-            };
-
-
-        private:
+        protected:
             struct ListEntry {
                 Element *element;
                 u16 height;
@@ -974,6 +973,21 @@ namespace tsl {
             u16 m_offset = 1;
             u16 m_entriesShown = 5;
         };
+
+        class CustomDrawer : public Element {
+            public:
+                CustomDrawer(std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> renderFunc) : Element(), m_renderFunc(renderFunc) {}
+                ~CustomDrawer() {}
+
+                virtual void draw(gfx::Renderer* renderer) override {
+                    this->m_renderFunc(renderer, this->getX(), this->getY(), this->getWidth(), this->getHeight());
+                }
+
+                virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {}
+
+            private:
+                std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> m_renderFunc;
+            };
 
     }
 
