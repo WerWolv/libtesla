@@ -434,6 +434,25 @@ namespace tsl {
             }
 
             /**
+             * @brief Draws a RGBA8888 bitmap from memory
+             * 
+             * @param x X start position
+             * @param y Y start position
+             * @param w Bitmap width
+             * @param h Bitmap height
+             * @param bmp Pointer to bitmap data
+             */
+            void drawBitmap(s32 x, s32 y, s32 w, s32 h, const u8 *bmp) {
+                for (s32 y1 = 0; y1 < h; y1++) {
+                    for (s32 x1 = 0; x1 < w; x1++) {
+                        const Color color = { static_cast<u8>(bmp[1] >> 4), static_cast<u8>(bmp[2] >> 4), static_cast<u8>(bmp[3] >> 4), static_cast<u8>(bmp[0] >> 4) };
+                        setPixelBlendSrc(x + x1, y + y1, a(color));
+                        bmp += 4;
+                    }
+                }
+            }
+
+            /**
              * @brief Fills the entire layer with a given color
              * 
              * @param color Color
