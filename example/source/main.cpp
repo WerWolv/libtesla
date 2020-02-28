@@ -3,6 +3,8 @@
 
 class GuiTest : public tsl::Gui {
 public:
+    GuiTest(u8 arg1, u8 arg2, bool arg3) { }
+
     // Called when this Gui gets loaded to create the UI
     // Allocate all your elements on the heap. libtesla will make sure to clean them up when not needed anymore
     virtual tsl::elm::Element* createUI() override {
@@ -28,7 +30,7 @@ public:
     }
 };
 
-class OverlayTest : public tsl::Overlay<GuiTest> {
+class OverlayTest : public tsl::Overlay {
 public:
                                              // libtesla already initialized fs, hid, pl, pmdmnt, hid:sys, set:sys and the SD card
     virtual void initServices() override {}  // Called at the start to initialize all services necessary for this Overlay
@@ -36,6 +38,10 @@ public:
 
     virtual void onShow() override {}    // Called before overlay wants to change from invisible to visible state
     virtual void onHide() override {}    // Called before overlay wants to change from visible to invisible state
+
+    virtual std::unique_ptr<tsl::Gui> loadInitialGui() override {
+        return initially<GuiTest>(1, 2, true);  // Initial Gui to load. It's possible to pass arguments to it's constructor like this
+    }
 };
 
 int main(int argc, char **argv) {

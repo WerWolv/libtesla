@@ -92,20 +92,27 @@ namespace tsl {
         Right
     };
 
-    template <typename, typename>
     class Overlay;
+
+
 
     
 
-    namespace impl { enum class LaunchFlags : u8; }
+    namespace impl { 
+        enum class LaunchFlags : u8 {
+            None = 0,
+            SkipComboInitially = BIT(0)
+        };
+    }
 
+    template<typename TOverlay, impl::LaunchFlags launchFlags = impl::LaunchFlags::SkipComboInitially>   
+    int loop(int argc, char** argv);
 
     // Helpers
 
     namespace hlp {
 
         template<auto> struct dependent_false : std::false_type { };
-        struct OverlayBase { };
 
         static inline void doWithSmSession(std::function<void()> f) {
             smInitialize();
@@ -241,7 +248,6 @@ namespace tsl {
         public:
             Renderer& operator=(Renderer&) = delete;
 
-            template <typename>
             friend class tsl::Overlay;
 
             static Color a(const Color &c) {
@@ -1051,7 +1057,6 @@ namespace tsl {
         elm::Element *m_focusedElement = nullptr;
         elm::Element *m_topElement = nullptr;
 
-        template <typename, typename>
         friend class Overlay;
         friend class gfx::Renderer;
     };
@@ -1059,17 +1064,19 @@ namespace tsl {
 
     // Overlay
 
-    template<typename Gui, typename Enabled = void>
-    class Overlay;
-
-    template <typename Gui>
-    class Overlay<Gui, std::enable_if_t<std::is_base_of_v<tsl::Gui, Gui>>> : private hlp::OverlayBase {
+    class Overlay {
+    protected:
+        Overlay() {}                // Called once when overlay gets loaded
     public:
+        virtual ~Overlay() {}       // Called once before overlay exits and 
+
         virtual void initServices() {}  // Called at the start to initialize all services necessary for this Overlay
         virtual void exitServices() {}  // Callet at the end to clean up all services previously initialized
 
         virtual void onShow() {}        // Called before overlay wants to change from invisible to visible state
         virtual void onHide() {}        // Called before overlay wants to change from visible to invisible state
+
+        virtual std::unique_ptr<tsl::Gui> loadInitialGui() = 0;
 
         virtual std::unique_ptr<tsl::Gui>& getCurrentGui() final {
             return this->m_guiStack[this->m_guiStack.size() - 1];
@@ -1113,15 +1120,11 @@ namespace tsl {
             return this->m_shouldClose;
         }
 
-        static auto& get() {
-            static Overlay overlay;
-
-            return overlay;
-        }
-
     protected:
-        Overlay() {}                // Called once when overlay gets loaded
-        virtual ~Overlay() {}       // Called once before overlay exits and 
+        template<typename T, typename ... Args>
+        constexpr inline std::unique_ptr<T> initially(Args ... args) {
+            return std::move(std::make_unique<T>(args...));
+        }
 
         template<typename G, typename ...Args>
         std::unique_ptr<tsl::Gui>& changeTo(Args&&... args) {
@@ -1133,6 +1136,16 @@ namespace tsl {
 
             return this->m_guiStack.back();
         }
+
+        std::unique_ptr<tsl::Gui>& changeTo(std::unique_ptr<tsl::Gui>&& gui) {
+            gui->m_topElement = gui->createUI();
+            gui->requestFocus(gui->m_topElement, FocusDirection::None);
+
+            this->m_guiStack.push_back(std::move(gui));
+
+            return this->m_guiStack.back();
+        }
+
 
         void goBack() {
             if (this->m_guiStack.size() > 0)
@@ -1152,13 +1165,6 @@ namespace tsl {
         bool m_shouldClose = false;
 
         bool m_disableNextAnimation = false;
-        
-        virtual void loadDefaultGui() final { 
-            if (this->m_guiStack.size() != 0) 
-                return;
-
-            this->changeTo<Gui>();
-        }
 
         virtual void initScreen() final {
             gfx::Renderer::get().init();
@@ -1256,19 +1262,14 @@ namespace tsl {
             this->m_disableNextAnimation = true;
         }
 
-        template<typename, impl::LaunchFlags launchFlags>
-        friend int loop(int argv, char** argc);
+        template<typename, tsl::impl::LaunchFlags>
+        friend int loop(int argc, char** argv);
 
         friend class tsl::Gui;
     };
 
     
     namespace impl {
-        
-        enum class LaunchFlags : u8 {
-            None = 0,
-            SkipComboInitially = BIT(0)
-        };
 
         [[maybe_unused]] static LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
             return static_cast<LaunchFlags>(u8(lhs) | u8(rhs));
@@ -1278,6 +1279,8 @@ namespace tsl {
             bool running = false;
 
             Event comboEvent = { 0 }, homeButtonPressEvent = { 0 }, powerButtonPressEvent = { 0 };
+
+            std::unique_ptr<Overlay> overlay;
 
             u64 launchCombo = KEY_L | KEY_DDOWN | KEY_RSTICK;
             bool overlayOpen = false;
@@ -1310,7 +1313,7 @@ namespace tsl {
                 launchCombo |= hlp::stringToKeyCode(key);
         }
 
-        template<typename Overlay, impl::LaunchFlags launchFlags>
+        template<impl::LaunchFlags launchFlags>
         static void hidInputPoller(void *args) {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
@@ -1364,7 +1367,7 @@ namespace tsl {
 
                 if (((shData->keysHeld & shData->launchCombo) == shData->launchCombo) && shData->keysDown & shData->launchCombo) {
                     if (shData->overlayOpen) {
-                        Overlay::get().hide();
+                        shData->overlay->hide();
                         shData->overlayOpen = false;
                     }
                     else
@@ -1373,7 +1376,7 @@ namespace tsl {
 
                 if (shData->touchPos.px >= cfg::FramebufferWidth && shData->overlayOpen) {
                     if (shData->overlayOpen) {
-                        Overlay::get().hide();
+                        shData->overlay->hide();
                         shData->overlayOpen = false;
                     }
                 }
@@ -1383,7 +1386,6 @@ namespace tsl {
             }
         }
 
-        template<typename Overlay>
         static void homeButtonDetector(void *args) {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
@@ -1396,7 +1398,7 @@ namespace tsl {
                     eventClear(&shData->homeButtonPressEvent);
 
                     if (shData->overlayOpen) {
-                        Overlay::get().hide();
+                        shData->overlay->hide();
                         shData->overlayOpen = false;
                     }
                 }
@@ -1404,7 +1406,6 @@ namespace tsl {
 
         }
 
-        template<typename Overlay>
         static void powerButtonDetector(void *args) {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
@@ -1417,7 +1418,7 @@ namespace tsl {
                     eventClear(&shData->powerButtonPressEvent);
 
                     if (shData->overlayOpen) {
-                        Overlay::get().hide();
+                        shData->overlay->hide();
                         shData->overlayOpen = false;
                     }
                 }
@@ -1429,30 +1430,32 @@ namespace tsl {
 
 
 
-    template<typename Overlay, impl::LaunchFlags launchFlags = impl::LaunchFlags::SkipComboInitially>   
+    template<typename TOverlay, impl::LaunchFlags launchFlags>   
     static inline int loop(int argc, char** argv) {
-        static_assert(std::is_base_of_v<tsl::hlp::OverlayBase, Overlay>, "tsl::loop expects a type derived from tsl::Overlay");
+        static_assert(std::is_base_of_v<tsl::Overlay, TOverlay>, "tsl::loop expects a type derived from tsl::Overlay");
 
         impl::SharedThreadData shData;
 
         shData.running = true;
 
         Thread hidPollerThread, homeButtonDetectorThread, powerButtonDetectorThread;
-        threadCreate(&hidPollerThread, impl::hidInputPoller<Overlay, launchFlags>, &shData, nullptr, 0x1000, 0x2C, -2);
-        threadCreate(&homeButtonDetectorThread, impl::homeButtonDetector<Overlay>, &shData, nullptr, 0x1000, 0x2C, -2);
-        threadCreate(&powerButtonDetectorThread, impl::powerButtonDetector<Overlay>, &shData, nullptr, 0x1000, 0x2C, -2);
+        threadCreate(&hidPollerThread, impl::hidInputPoller<launchFlags>, &shData, nullptr, 0x1000, 0x2C, -2);
+        threadCreate(&homeButtonDetectorThread, impl::homeButtonDetector, &shData, nullptr, 0x1000, 0x2C, -2);
+        threadCreate(&powerButtonDetectorThread, impl::powerButtonDetector, &shData, nullptr, 0x1000, 0x2C, -2);
         threadStart(&hidPollerThread);
         threadStart(&homeButtonDetectorThread);
         threadStart(&powerButtonDetectorThread);
 
 
-        auto& overlay = Overlay::get();
-        overlay.initServices();
-        overlay.initScreen();
-        overlay.loadDefaultGui();
+        auto& overlay = shData.overlay;
+        overlay = std::make_unique<TOverlay>();
+
+        overlay->initServices();
+        overlay->initScreen();
+        overlay->changeTo(overlay->loadInitialGui());
 
         if (u8(launchFlags) & u8(impl::LaunchFlags::SkipComboInitially))
-            overlay.disableNextAnimation();
+            overlay->disableNextAnimation();
 
         while (shData.running) {
             
@@ -1463,29 +1466,29 @@ namespace tsl {
 
             hlp::requestForeground(true);
 
-            overlay.show();
-            overlay.clearScreen();
+            overlay->show();
+            overlay->clearScreen();
 
             while (shData.running) {
-                overlay.loop();
+                overlay->loop();
 
                 {
                     std::scoped_lock lock(shData.dataMutex);
-                    overlay.handleInput(shData.keysDown, shData.keysHeld, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
+                    overlay->handleInput(shData.keysDown, shData.keysHeld, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
 
                     shData.keysDown = 0x00;
                     shData.keysHeld = 0x00;
                 }
 
-                if (overlay.shouldHide())
+                if (overlay->shouldHide())
                     break;
                 
-                if (overlay.shouldClose())
+                if (overlay->shouldClose())
                     shData.running = false;
             }
 
-            overlay.clearScreen();
-            overlay.resetFlags();
+            overlay->clearScreen();
+            overlay->resetFlags();
 
             hlp::requestForeground(false);
 
@@ -1504,8 +1507,8 @@ namespace tsl {
         threadWaitForExit(&powerButtonDetectorThread);
         threadClose(&powerButtonDetectorThread);
 
-        overlay.exitScreen();
-        overlay.exitServices();
+        overlay->exitScreen();
+        overlay->exitServices();
         
         return 0;
     }
