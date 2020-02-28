@@ -79,7 +79,7 @@ namespace tsl {
         constexpr u32 ListItemDefaultHeight = 72;
 
         namespace color {
-            constexpr u16 ColorTransparent = 0xFFFF;
+            constexpr u16 ColorTransparent = 0x0000;    ///< Transparent color
         }
     }
 
