@@ -1923,7 +1923,7 @@ namespace tsl {
             fread(&configFileData[0], sizeof(char), configFileSize, configFile);
             fclose(configFile);
 
-            hlp::IniData parsedConfig = hlp::ini::parseIni(configFileData);
+            hlp::ini::IniData parsedConfig = hlp::ini::parseIni(configFileData);
 
             launchCombo = 0x00;
             for (std::string key : hlp::split(parsedConfig["tesla"]["key_combo"], '+'))
