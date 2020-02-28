@@ -63,20 +63,20 @@ namespace tsl {
 
     namespace cfg {
 
-        constexpr u32 ScreenWidth = 1920;
-        constexpr u32 ScreenHeight = 1080;
+        constexpr u32 ScreenWidth = 1920;       ///< Width of the Screen
+        constexpr u32 ScreenHeight = 1080;      ///< Height of the Screen
 
-        extern u16 LayerWidth;
-        extern u16 LayerHeight;
-        extern u16 LayerPosX;
-        extern u16 LayerPosY;
-        extern u16 FramebufferWidth;
-        extern u16 FramebufferHeight;
+        extern u16 LayerWidth;                  ///< Width of the Tesla layer
+        extern u16 LayerHeight;                 ///< Height of the Tesla layer
+        extern u16 LayerPosX;                   ///< X position of the Tesla layer
+        extern u16 LayerPosY;                   ///< Y position of the Tesla layer
+        extern u16 FramebufferWidth;            ///< Width of the framebuffer
+        extern u16 FramebufferHeight;           ///< Height of the framebuffer
 
     }
 
     namespace style {
-        constexpr u32 ListItemDefaultHeight = 72;
+        constexpr u32 ListItemDefaultHeight = 72;   ///< Height of a standard ListItem
 
         namespace color {
             constexpr u16 ColorTransparent = 0x0000;    ///< Transparent color
@@ -84,25 +84,35 @@ namespace tsl {
     }
 
     // Declarations
+
+    /**
+     * @brief Direction in which focus moved before landing on
+     *        the currently focused element
+     */
     enum class FocusDirection {
-        None,
-        Up,
-        Down,
-        Left,
-        Right
+        None,                       ///< Focus was placed on the element programatically without user input
+        Up,                         ///< Focus moved upwards
+        Down,                       ///< Focus moved downwards
+        Left,                       ///< Focus moved from left to rigth
+        Right                       ///< Focus moved from right to left
     };
 
     class Overlay;
 
-
-
-    
-
     namespace impl { 
+        
+        /**
+         * @brief Overlay launch parameters
+         */
         enum class LaunchFlags : u8 {
-            None = 0,
-            SkipComboInitially = BIT(0)
+            None = 0,                       ///< Do nothing special at launch
+            SkipComboInitially = BIT(0)     ///< Immediately open overlay when launched. Should be used for anything that isn't the default menu
         };
+
+        [[maybe_unused]] static LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
+            return static_cast<LaunchFlags>(u8(lhs) | u8(rhs));
+        }
+
     }
 
     template<typename TOverlay, impl::LaunchFlags launchFlags = impl::LaunchFlags::SkipComboInitially>   
@@ -111,15 +121,25 @@ namespace tsl {
     // Helpers
 
     namespace hlp {
-
-        template<auto> struct dependent_false : std::false_type { };
-
+        
+        /**
+         * @brief Wrapper for service initialization
+         * 
+         * @param f wrapped function
+         */
         static inline void doWithSmSession(std::function<void()> f) {
             smInitialize();
             f();
             smExit();
         }
 
+        /**
+         * @brief libnx hid:sys shim that gives or takes away frocus to or from the process with the given aruid
+         * 
+         * @param enable Give focus or take focus
+         * @param aruid Aruid of the process to focus/unfocus
+         * @return Result Result
+         */
         static Result hidsysEnableAppletToGetInput(bool enable, u64 aruid) {  
             const struct {
                 u8 permitInput;
@@ -129,6 +149,11 @@ namespace tsl {
             return serviceDispatchIn(hidsysGetServiceSession(), 503, in);
         }
 
+        /**
+         * @brief Toggles focus between the Tesla overlay and the rest of the system
+         * 
+         * @param enabled Focus Tesla?
+         */
         static void requestForeground(bool enabled) {
             u64 applicationAruid = 0, appletAruid = 0;
 
@@ -145,6 +170,13 @@ namespace tsl {
             hidsysEnableAppletToGetInput(true, 0);
         }
 
+        /**
+         * @brief Splits a string at the given delimeters
+         * 
+         * @param str String to split
+         * @param delim Delimeter
+         * @return Vector containing the split tokens
+         */
         static std::vector<std::string> split(const std::string& str, char delim = ' ') {
             std::vector<std::string> out;
 
@@ -160,29 +192,48 @@ namespace tsl {
             return out;
         }
 
-        using IniData = std::map<std::string, std::map<std::string, std::string>>;
+        namespace ini {
 
-        static IniData parseIni(std::string &str) {
-            IniData iniData;
-            
-            auto lines = split(str, '\n');
+            /**
+             * @brief Ini file type
+             */
+            using IniData = std::map<std::string, std::map<std::string, std::string>>;
 
-            std::string lastHeader = "";
-            for (auto& line : lines) {
-                line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
+            /**
+             * @brief Parses a ini string
+             * 
+             * @param str String to parse
+             * @return Parsed data
+             */
+            static IniData parseIni(std::string &str) {
+                IniData iniData;
+                
+                auto lines = split(str, '\n');
 
-                if (line[0] == '[' && line[line.size() - 1] == ']') {
-                    lastHeader = line.substr(1, line.size() - 2);
-                    iniData.emplace(lastHeader, std::map<std::string, std::string>{});
+                std::string lastHeader = "";
+                for (auto& line : lines) {
+                    line.erase(std::remove_if(line.begin(), line.end(), ::isspace), line.end());
+
+                    if (line[0] == '[' && line[line.size() - 1] == ']') {
+                        lastHeader = line.substr(1, line.size() - 2);
+                        iniData.emplace(lastHeader, std::map<std::string, std::string>{});
+                    }
+                    else if (auto keyValuePair = split(line, '='); keyValuePair.size() == 2) {
+                        iniData[lastHeader].emplace(keyValuePair[0], keyValuePair[1]);
+                    }
                 }
-                else if (auto keyValuePair = split(line, '='); keyValuePair.size() == 2) {
-                    iniData[lastHeader].emplace(keyValuePair[0], keyValuePair[1]);
-                }
+
+                return iniData;
             }
 
-            return iniData;
         }
 
+        /**
+         * @brief Decodes a key string into it's key code
+         * 
+         * @param value Key string
+         * @return Key code
+         */
         static u64 stringToKeyCode(std::string &value) {
             if (strcasecmp(value.c_str(), "A")           == 0)
                 return KEY_A;
@@ -231,6 +282,9 @@ namespace tsl {
 
         extern "C" u64 __nx_vi_layer_id;
 
+        /**
+         * @brief RGBA4444 Color structure
+         */
         struct Color {
 
             union {
@@ -244,17 +298,33 @@ namespace tsl {
             inline Color(u8 r, u8 g, u8 b, u8 a): r(r), g(g), b(b), a(a) {}
         };
 
+        /**
+         * @brief Manages the Tesla layer and draws raw data to the screen
+         */
         class Renderer final {
         public:
             Renderer& operator=(Renderer&) = delete;
 
             friend class tsl::Overlay;
 
+            /**
+             * @brief Handles opacity of drawn colors for fadeout. Pass all colors through this function in order to apply opacity properly
+             * 
+             * @param c Original color
+             * @return Color with applied opacity
+             */
             static Color a(const Color &c) {
                 return (c.rgba & 0x0FFF) | (static_cast<u8>(c.a * Renderer::s_opacity) << 12);
             }
 
-
+            /**
+             * @brief Enables scissoring, discarding of any draw outside the given boundaries
+             * 
+             * @param x x pos
+             * @param y y pos
+             * @param w Width
+             * @param h Height
+             */
             inline void enableScissoring(u16 x, u16 y, u16 w, u16 h) {
                 this->m_scissoring = true;
 
@@ -264,12 +334,23 @@ namespace tsl {
                 this->m_scissorBounds[3] = h;
             }
 
+            /**
+             * @brief Disables scissoring
+             */
             inline void disableScissoring() {
                 this->m_scissoring = false;
             }
 
 
             // Drawing functions
+
+            /**
+             * @brief Draw a single pixel onto the screen
+             * 
+             * @param x X pos 
+             * @param y Y pos
+             * @param color Color
+             */
             inline void setPixel(u16 x, u16 y, Color color) {
                 if (x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
                     return;
@@ -277,12 +358,27 @@ namespace tsl {
                 static_cast<Color*>(this->getCurrentFramebuffer())[this->getPixelOffset(x, y)] = color;
             }
 
+            /**
+             * @brief Blends two colors
+             * 
+             * @param src Source color
+             * @param dst Destination color
+             * @param alpha Opacity
+             * @return Blended color
+             */
             inline u8 blendColor(u8 src, u8 dst, u8 alpha) {
                 u8 oneMinusAlpha = 0x0F - alpha;
 
                 return (dst * alpha + src * oneMinusAlpha) / float(0xF);
             }
-
+            
+            /**
+             * @brief Draws a single source blended pixel onto the screen
+             * 
+             * @param x X pos 
+             * @param y Y pos
+             * @param color Color
+             */
             inline void setPixelBlendSrc(u16 x, u16 y, Color color) {
                 if (x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
                     return;
@@ -299,6 +395,13 @@ namespace tsl {
                 this->setPixel(x, y, end);
             }
 
+            /**
+             * @brief Draws a single destination blended pixel onto the screen
+             * 
+             * @param x X pos 
+             * @param y Y pos
+             * @param color Color
+             */
             inline void setPixelBlendDst(u16 x, u16 y, Color color) {
                 if (x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
                     return;
@@ -315,20 +418,49 @@ namespace tsl {
                 this->setPixel(x, y, end);
             }
 
+            /**
+             * @brief Draws a rectangle of given sizes
+             * 
+             * @param x X pos
+             * @param y Y pos
+             * @param w Width
+             * @param h Height
+             * @param color Color
+             */
             inline void drawRect(u16 x, u16 y, u16 w, u16 h, Color color) {
                 for (s16 x1 = x; x1 < (x + w); x1++)
                     for (s16 y1 = y; y1 < (y + h); y1++)
                         this->setPixelBlendDst(x1, y1, color);
             }
 
+            /**
+             * @brief Fills the entire layer with a given color
+             * 
+             * @param color Color
+             */
             inline void fillScreen(Color color) {
                 std::fill_n(static_cast<Color*>(this->getCurrentFramebuffer()), this->getFramebufferSize() / sizeof(Color), color);
             }
 
+            /**
+             * @brief Clears the layer (With transparency)
+             * 
+             */
             inline void clearScreen() {
                 this->fillScreen({ 0x00, 0x00, 0x00, 0x00 });
             }
 
+            /**
+             * @brief Draws a string
+             * 
+             * @param string String to draw
+             * @param monospace Draw string in monospace font
+             * @param x X pos
+             * @param y Y pos
+             * @param fontSize Height of the text drawn in pixels 
+             * @param color Text color. Use transparent color to skip drawing and only get the string's dimensions
+             * @return Dimensions of drawn string
+             */
             std::pair<u32, u32> drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color) {
                 const size_t stringLength = strlen(string);
 
@@ -389,12 +521,22 @@ namespace tsl {
         private:
             Renderer() {}
 
+            /**
+             * @brief Gets the renderer instance
+             * 
+             * @return Renderer
+             */
             static Renderer& get() {
                 static Renderer renderer;
 
                 return renderer;
             }
 
+            /**
+             * @brief Sets the opacity of the layer
+             * 
+             * @param opacity Opacity
+             */
             static void setOpacity(float opacity) {
                 opacity = std::clamp(opacity, 0.0F, 1.0F);
 
@@ -417,35 +559,75 @@ namespace tsl {
 
             static inline float s_opacity = 1.0F;
 
-                    
+            /**
+             * @brief Get the current framebuffer address
+             * 
+             * @return Framebuffer address
+             */
             inline void* getCurrentFramebuffer() {
                 return this->m_currentFramebuffer;
             }
 
+            /**
+             * @brief Get the next framebuffer address
+             * 
+             * @return Next framebuffer address
+             */
             inline void* getNextFramebuffer() {
                 return static_cast<u8*>(this->m_framebuffer.buf) + this->getNextFramebufferSlot() * this->getFramebufferSize();
             }
 
+            /**
+             * @brief Get the framebuffer size
+             * 
+             * @return Framebuffer size
+             */
             inline size_t getFramebufferSize() {
                 return this->m_framebuffer.fb_size;
             }
 
+            /**
+             * @brief Get the number of framebuffers in use
+             * 
+             * @return Number of framebuffers
+             */
             inline size_t getFramebufferCount() {
                 return this->m_framebuffer.num_fbs;
             }
 
+            /**
+             * @brief Get the currently used framebuffer's slot
+             * 
+             * @return Slot
+             */
             inline u8 getCurrentFramebufferSlot() {
                 return this->m_window.cur_slot;
             }
 
+            /**
+             * @brief Get the next framebuffer's slot
+             * 
+             * @return Next slot
+             */
             inline u8 getNextFramebufferSlot() {
                 return (this->getCurrentFramebufferSlot() + 1) % this->getFramebufferCount();
             }
 
+            /**
+             * @brief Waits for the vsync event
+             * 
+             */
             inline void waitForVSync() {
                 eventWait(&this->m_vsyncEvent, UINT64_MAX);
             }
 
+            /**
+             * @brief Decodes a x and y coordinate into a offset into the swizzled framebuffer
+             * 
+             * @param x X pos
+             * @param y Y Pos
+             * @return Offset
+             */
             const u32 getPixelOffset(u32 x, u32 y) {
                 if (this->m_scissoring) {
                     if (x < this->m_scissorBounds[0] ||
@@ -463,6 +645,10 @@ namespace tsl {
                 return tmpPos / 2;
             }
 
+            /**
+             * @brief Initializes the renderer and layers
+             * 
+             */
             void init() {
 
                 cfg::LayerPosX = 0;
@@ -496,6 +682,10 @@ namespace tsl {
                 this->m_initialized = true;
             }
 
+            /**
+             * @brief Exits the renderer and layer
+             * 
+             */
             void exit() {
                 if (!this->m_initialized)
                     return;
@@ -509,6 +699,11 @@ namespace tsl {
                 viExit();
             }
 
+            /**
+             * @brief Initializes Nintendo's shared fonts. Default and Extended
+             * 
+             * @return Result
+             */
             Result initFonts() {
                 Result res;
 
@@ -531,10 +726,18 @@ namespace tsl {
                 return res;
             }
             
+            /**
+             * @brief Start a new frame
+             * @warning Don't call this more than once before calling \ref endFrame
+             */
             inline void startFrame() {
                 this->m_currentFramebuffer = framebufferBegin(&this->m_framebuffer, nullptr);
             }
 
+            /**
+             * @brief End the current frame
+             * @warning Don't call this before calling \ref startFrame once
+             */
             inline void endFrame() {
                 std::memcpy(this->getNextFramebuffer(), this->getCurrentFramebuffer(), this->getFramebufferSize());
                 this->waitForVSync();
@@ -543,7 +746,16 @@ namespace tsl {
                 this->m_currentFramebuffer = nullptr;
             }
 
-
+            /**
+             * @brief Draws a single font glyph
+             * 
+             * @param codepoint Unicode codepoint to draw
+             * @param x X pos
+             * @param y Y pos
+             * @param color Color
+             * @param font STB Font to use
+             * @param fontSize Font size
+             */
             inline void drawGlyph(s32 codepoint, u32 x, u32 y, Color color, stbtt_fontinfo *font, float fontSize) {
                 int width = 10, height = 10;
 
@@ -570,27 +782,80 @@ namespace tsl {
     // Elements
 
     namespace elm {
-
+        
+        /**
+         * @brief The top level Element of the libtesla UI library
+         * @note When creating your own elements, extend from this or one of it's sub classes
+         */
         class Element {
         public:
             Element() {}
             virtual ~Element() {}
 
+            /**
+             * @brief Handles focus requesting
+             * @note This function should return the element to focus. 
+             *       When this element should be focused, return `this`. 
+             *       When one of it's child should be focused, return `this->child->requestFocus(oldFocus, direction)`
+             *       When this element is not focusable, return `nullptr`
+             * 
+             * @param oldFocus Previously focused element
+             * @param direction Direction in which focus moved. \ref FocusDirection::None is passed for the initial load
+             * @return Element to focus
+             */
             virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) {
                 return nullptr;
             }
-
+            
+            /**
+             * @brief Function called when a joycon button got pressed
+             * 
+             * @param keys Keys pressed in the last frame
+             * @return true when button press has been consumed
+             * @return false when button press should be passed on to the parent
+             */
             virtual bool onClick(u64 keys) {
                 return m_clickListener(keys);
             }
 
+            /**
+             * @brief Function called when the element got touched
+             * @todo Not yet implemented
+             * 
+             * @param x X pos
+             * @param y Y pos
+             * @return true when touch input has been consumed
+             * @return false when touch input should be passed on to the parent
+             */
             virtual bool onTouch(u32 x, u32 y) {
                 return false;
             }
 
+            /**
+             * @brief Called once per frame to draw the element
+             * @warning Do not call this yourself. Use \ref Element::frame(gfx::Renderer *renderer)
+             * 
+             * @param renderer Renderer
+             */
             virtual void draw(gfx::Renderer *renderer) = 0;
+
+            /**
+             * @brief Called when the underlying Gui gets created and after calling \ref Gui::invalidate() to calculate positions and boundaries of the element
+             * @warning Do not call this yourself. Use \ref Element::invalidate()
+             * 
+             * @param parentX Parent X pos
+             * @param parentY Parent Y pos
+             * @param parentWidth Parent Width
+             * @param parentHeight Parent Height
+             */
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) = 0;
 
+            /**
+             * @brief Draws highlighting and the element itself
+             * @note When drawing children of a element in \ref Element::draw(gfx::Renderer *renderer), use `this->child->frame(renderer)` instead of calling draw directly
+             * 
+             * @param renderer 
+             */
             virtual void frame(gfx::Renderer *renderer) final {
                 if (this->m_focused)
                     this->drawHighlight(renderer);
@@ -598,6 +863,10 @@ namespace tsl {
                 this->draw(renderer);
             }
 
+            /**
+             * @brief Forces a layout recreation of a element
+             * 
+             */
             virtual void invalidate() final {
                 const auto& parent = this->getParent();
 
@@ -607,12 +876,23 @@ namespace tsl {
                     this->layout(parent->getX(), parent->getY(), parent->getWidth(), parent->getHeight());
             }
 
+            /**
+             * @brief Shake the highlight in the given direction to signal that the focus cannot move there
+             * 
+             * @param direction Direction to shake highlight in
+             */
             virtual void shakeHighlight(FocusDirection direction) final {
                 this->m_highlightShaking = true;
                 this->m_highlightShakingDirection = direction;
                 this->m_highlightShakingStartTime = std::chrono::system_clock::now();
             }
 
+            /**
+             * @brief Draws the blue boarder when a element is highlighted
+             * @note Override this if you have a element that e.g requires a non-rectangular focus
+             * 
+             * @param renderer Renderer
+             */
             virtual void drawHighlight(gfx::Renderer *renderer) {
                 static float counter = 0;
                 const float progress = (std::sin(counter) + 1) / 2;
@@ -662,6 +942,14 @@ namespace tsl {
                 renderer->drawRect(this->m_x + x + this->m_width, this->m_y + y, 4, this->m_height, a(highlightColor));
             }
 
+            /**
+             * @brief Sets the boundaries of this view
+             * 
+             * @param x Start X pos
+             * @param y Start Y pos
+             * @param width Width
+             * @param height Height
+             */
             virtual void setBoundaries(u16 x, u16 y, u16 width, u16 height) final {
                 this->m_x = x;
                 this->m_y = y;
@@ -669,18 +957,60 @@ namespace tsl {
                 this->m_height = height;
             }
 
+            /**
+             * @brief Adds a click listener to the element
+             * 
+             * @param clickListener Click listener called with keys that were pressed last frame. Callback should return true if keys got consumed
+             */
             virtual void setClickListener(std::function<bool(u64 keys)> clickListener) {
                 this->m_clickListener = clickListener;
             }
 
+            /**
+             * @brief Gets the element's X position
+             * 
+             * @return X position
+             */
             virtual inline u16 getX() final { return this->m_x; }
+            /**
+             * @brief Gets the element's Y position
+             * 
+             * @return Y position
+             */
             virtual inline u16 getY() final { return this->m_y; }
+            /**
+             * @brief Gets the element's Width
+             * 
+             * @return Width
+             */
             virtual inline u16 getWidth()  final { return this->m_width;  }
+            /**
+             * @brief Gets the element's Height
+             * 
+             * @return Height
+             */
             virtual inline u16 getHeight() final { return this->m_height; }
 
+            /**
+             * @brief Sets the element's parent
+             * @note This is required to handle focus and button downpassing properly
+             * 
+             * @param parent Parent
+             */
             virtual inline void setParent(Element *parent) final { this->m_parent = parent; }
+
+            /**
+             * @brief Get the element's parent
+             * 
+             * @return Parent
+             */
             virtual inline Element* getParent() final { return this->m_parent; }
 
+            /**
+             * @brief Marks this element as focused or unfocused to draw the highlight
+             * 
+             * @param focused Focused
+             */
             virtual inline void setFocused(bool focused) { this->m_focused = focused; }
 
         protected:
@@ -700,6 +1030,13 @@ namespace tsl {
             std::chrono::system_clock::time_point m_highlightShakingStartTime;
             FocusDirection m_highlightShakingDirection;
 
+            /**
+             * @brief Shake animation callculation based on a damped sine wave
+             * 
+             * @param t Passed time
+             * @param a Amplitude
+             * @return Damped sine wave output
+             */
             int shakeAnimation(std::chrono::system_clock::duration t, float a) {
                 float w = 0.2F;
                 float tau = 0.05F;
@@ -711,8 +1048,18 @@ namespace tsl {
         };
 
 
+        /**
+         * @brief The base frame which can contain another view
+         * 
+         */
         class OverlayFrame : public Element {
         public:
+            /**
+             * @brief Constructor
+             * 
+             * @param title Name of the Overlay drawn bolt at the top
+             * @param subtitle Subtitle drawn bellow the title e.g version number
+             */
             OverlayFrame(std::string title, std::string subtitle) : Element(), m_title(title), m_subtitle(subtitle) {}
             ~OverlayFrame() {
                 if (this->m_contentElement != nullptr)
@@ -748,6 +1095,11 @@ namespace tsl {
                     return nullptr;
             }
 
+            /**
+             * @brief Sets the content of the frame
+             * 
+             * @param content Element
+             */
             virtual void setContent(Element *content) final {
                 if (this->m_contentElement != nullptr)
                     delete this->m_contentElement;
@@ -766,9 +1118,17 @@ namespace tsl {
             std::string m_title, m_subtitle;
         };
 
-
+        /**
+         * @brief Single color rectangle element mainly used for debugging to visualize boundaries
+         * 
+         */
         class DebugRectangle : public Element {
         public:
+            /**
+             * @brief Constructor
+             * 
+             * @param color Color of the rectangle
+             */
             DebugRectangle(gfx::Color color) : Element(), m_color(color) {}
             ~DebugRectangle() {}
 
@@ -782,9 +1142,17 @@ namespace tsl {
             gfx::Color m_color;
         };
 
-
+        /**
+         * @brief A item that goes into a list
+         * 
+         */
         class ListItem : public Element {
         public:
+            /**
+             * @brief Constructor
+             * 
+             * @param text Initial description text
+             */
             ListItem(std::string text) : Element(), m_text(text) {}
             ~ListItem() {}
 
@@ -810,11 +1178,21 @@ namespace tsl {
                 return this;
             }
 
-
+            /**
+             * @brief Sets the left hand description text of the list item
+             * 
+             * @param text Text
+             */
             virtual inline void setText(std::string text) final { 
                 this->m_text = text;
             }
 
+            /**
+             * @brief Sets the right hand value text of the list item
+             * 
+             * @param value Text
+             * @param faint Should the text be drawn in a glowing green or a faint gray
+             */
             virtual inline void setValue(std::string value, bool faint = false) { 
                 this->m_value = value;
                 this->m_faint = faint;
@@ -829,9 +1207,20 @@ namespace tsl {
             u16 m_valueWidth = 0;
         };
 
-
+        /**
+         * @brief A toggleable list item that changes the state from On to Off when the A button gets pressed
+         * 
+         */
         class ToggleListItem : public ListItem {
         public:
+            /**
+             * @brief Constructor
+             * 
+             * @param text Initial description text
+             * @param initialState Is the toggle set to On or Off initially
+             * @param onValue Value drawn if the toggle is on
+             * @param offValue Value drawn if the toggle is off
+             */
             ToggleListItem(std::string text, bool initialState, std::string onValue = "On", std::string offValue = "Off")
                 : ListItem(text), m_state(initialState), m_onValue(onValue), m_offValue(offValue) {
                 
@@ -852,10 +1241,20 @@ namespace tsl {
                 return false;
             }
 
+            /**
+             * @brief Gets the current state of the toggle
+             * 
+             * @return State
+             */
             virtual inline bool getState() {
                 return this->m_state;
             }
 
+            /**
+             * @brief Sets the current state of the toggle. Updates the Value
+             * 
+             * @param state State
+             */
             virtual void setState(bool state) {
                 this->m_state = state;
 
@@ -867,6 +1266,11 @@ namespace tsl {
                 this->m_stateChangedListener(state);
             }
 
+            /**
+             * @brief Adds a listener that gets called whenever the state of the toggle changes
+             * 
+             * @param stateChangedListener Listener with the current state passed in as parameter
+             */
             void setStateChangedListener(std::function<void(bool)> stateChangedListener) {
                 this->m_stateChangedListener = stateChangedListener;
             } 
@@ -879,8 +1283,17 @@ namespace tsl {
         };
 
 
+        /**
+         * @brief A List containing list items
+         * 
+         */
         class List : public Element {
         public:
+            /**
+             * @brief Constructor
+             * 
+             * @param entriesShown Amount of items displayed in the list at once before scrolling starts
+             */
             List(u16 entriesShown = 5) : Element(), m_entriesShown(entriesShown) {}
             ~List() {
                 for (auto& item : this->m_items)
@@ -909,6 +1322,12 @@ namespace tsl {
                 }
             }
 
+            /**
+             * @brief Adds a new item to the list
+             * 
+             * @param element Element to add
+             * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
+             */
             virtual void addItem(Element *element, u16 height = 0) final {
                 if (height == 0) {
                     if (dynamic_cast<ListItem*>(element) != nullptr)
@@ -980,8 +1399,17 @@ namespace tsl {
             u16 m_entriesShown = 5;
         };
 
+        /**
+         * @brief A Element that exposes the renderer directly to draw custom views easily
+         */
         class CustomDrawer : public Element {
             public:
+                /**
+                 * @brief Constructor
+                 * @note This element should only be used to draw static things the user cannot interact with e.g info text, images, etc.
+                 * 
+                 * @param renderFunc Callback that will be called once every frame to draw this view
+                 */
                 CustomDrawer(std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> renderFunc) : Element(), m_renderFunc(renderFunc) {}
                 ~CustomDrawer() {}
 
@@ -999,6 +1427,11 @@ namespace tsl {
 
     // GUI
 
+    /**
+     * @brief The top level Gui class
+     * @note The main menu and every sub menu are a separate Gui. Create your own Gui class that extends from this one to create your own menus
+     * 
+     */
     class Gui {
     public:
         Gui() { }
@@ -1008,26 +1441,60 @@ namespace tsl {
                 delete this->m_topElement;
         }
 
+        /**
+         * @brief Creates all elements present in this Gui
+         * @note Implement this function and let it return a heap allocated element used as the top level element. This is usually some kind of frame e.g \ref OverlayFrame
+         * 
+         * @return Top level element
+         */
         virtual elm::Element* createUI() = 0;
+
+        /**
+         * @brief Called once per frame to update values
+         * 
+         */
         virtual void update() {}
+
+        /**
+         * @brief Called once per frame with the latest HID inputs
+         * 
+         * @param keysDown Buttons pressed in the last frame
+         * @param keysHeld Buttons held down longer than one frame
+         * @param touchInput Last touch position
+         * @param leftJoyStick Left joystick position
+         * @param rightJoyStick Right joystick position
+         * @return Weather or not the input has been consumed
+         */
         virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) {
             return false;
         }
 
-        virtual void draw(gfx::Renderer *renderer) final {
-            if (this->m_topElement != nullptr)
-                this->m_topElement->draw(renderer);
-        }
-
+        /**
+         * @brief Gets the top level element
+         * 
+         * @return Top level element
+         */
         virtual elm::Element* getTopElement() final {
             return this->m_topElement;
         }
 
+        /**
+         * @brief Get the currently focused element
+         * 
+         * @return Focused element
+         */
         virtual elm::Element* getFocusedElement() final {
             return this->m_focusedElement;
         }
-
-        virtual void requestFocus(elm::Element *element, FocusDirection direction) {
+        
+        /**
+         * @brief Requests focus to a element
+         * @note Use this function when focusing a element outside of a element's requestFocus function
+         * 
+         * @param element Element to focus
+         * @param direction Focus direction
+         */
+        virtual void requestFocus(elm::Element *element, FocusDirection direction) final {
             elm::Element *oldFocus = this->m_focusedElement;
 
             if (element != nullptr) {
@@ -1045,7 +1512,12 @@ namespace tsl {
                 this->m_focusedElement->shakeHighlight(direction);
         }
 
-        virtual void removeFocus(elm::Element* element = nullptr) {
+        /**
+         * @brief Removes focus from a element
+         * 
+         * @param element Element to remove focus from. Pass nullptr to remove the focus unconditionally
+         */
+        virtual void removeFocus(elm::Element* element = nullptr) final {
             if (element == nullptr || element == this->m_focusedElement)
                 this->m_focusedElement = nullptr;
         }
@@ -1059,29 +1531,86 @@ namespace tsl {
 
         friend class Overlay;
         friend class gfx::Renderer;
+
+        /**
+         * @brief Draws the Gui
+         * 
+         * @param renderer 
+         */
+        virtual void draw(gfx::Renderer *renderer) final {
+            if (this->m_topElement != nullptr)
+                this->m_topElement->draw(renderer);
+        }
     };
 
 
     // Overlay
 
+    /**
+     * @brief The top level Overlay class
+     * @note Every Tesla overlay should have exactly one Overlay class initializing services and loading the default Gui
+     */
     class Overlay {
     protected:
-        Overlay() {}                // Called once when overlay gets loaded
+        /**
+         * @brief Constructor
+         * @note Called once when the Overlay gets loaded
+         */
+        Overlay() {}
     public:
-        virtual ~Overlay() {}       // Called once before overlay exits and 
+        /**
+         * @brief Deconstructor
+         * @note Called once when the Overlay exits
+         * 
+         */
+        virtual ~Overlay() {}
 
-        virtual void initServices() {}  // Called at the start to initialize all services necessary for this Overlay
-        virtual void exitServices() {}  // Callet at the end to clean up all services previously initialized
+        /**
+         * @brief Initializes services
+         * @note Called once at the start to initializes services. You have a sm session available during this call, no need to initialize sm yourself
+         */
+        virtual void initServices() {} 
 
-        virtual void onShow() {}        // Called before overlay wants to change from invisible to visible state
-        virtual void onHide() {}        // Called before overlay wants to change from visible to invisible state
+        /**
+         * @brief Exits services
+         * @note Make sure to exit all services you initialized in \ref Overlay::initServices() here to prevent leaking handles
+         */
+        virtual void exitServices() {}
 
+        /**
+         * @brief Called before overlay changes from invisible to visible state
+         * 
+         */
+        virtual void onShow() {}
+
+        /**
+         * @brief Called before overlay changes from visible to invisible state
+         * 
+         */
+        virtual void onHide() {}
+
+        /**
+         * @brief Loads the default Gui
+         * @note This function should return the initial Gui to load using the \ref Gui::initially<T>(Args.. args) function
+         *       e.g `return initially<GuiMain>();`
+         * 
+         * @return Default Gui
+         */
         virtual std::unique_ptr<tsl::Gui> loadInitialGui() = 0;
 
+        /**
+         * @brief Gets a reference to the current Gui on top of the Gui stack
+         * 
+         * @return Current Gui reference
+         */
         virtual std::unique_ptr<tsl::Gui>& getCurrentGui() final {
             return this->m_guiStack[this->m_guiStack.size() - 1];
         }
 
+        /**
+         * @brief Shows the Gui
+         * 
+         */
         virtual void show() final {
             if (this->m_disableNextAnimation) {
                 this->m_animationCounter = 5;
@@ -1095,6 +1624,10 @@ namespace tsl {
             this->onShow();
         }
 
+        /**
+         * @brief Hides the Gui
+         * 
+         */
         virtual void hide() final {
             if (this->m_disableNextAnimation) {
                 this->m_animationCounter = 0;
@@ -1108,24 +1641,37 @@ namespace tsl {
             this->onHide();
         }
 
+        /**
+         * @brief Closes the Gui
+         * @note This makes the Tesla overlay exit and return back to the Tesla-Menu
+         * 
+         */
         virtual void close() final {
             this->m_shouldClose = true;
         }
 
-        virtual bool shouldHide() final {
-            return this->m_shouldHide;
-        }
-
-        virtual bool shouldClose() final {
-            return this->m_shouldClose;
-        }
-
     protected:
+        /**
+         * @brief Creates the initial Gui of an Overlay and moves the object to the Gui stack
+         * 
+         * @tparam T 
+         * @tparam Args 
+         * @param args 
+         * @return constexpr std::unique_ptr<T> 
+         */
         template<typename T, typename ... Args>
         constexpr inline std::unique_ptr<T> initially(Args ... args) {
             return std::move(std::make_unique<T>(args...));
         }
 
+        /**
+         * @brief Creates a new Gui and changes to it
+         * 
+         * @tparam G Gui to create 
+         * @tparam Args Arguments to pass to the Gui
+         * @param args Arguments to pass to the Gui
+         * @return Reference to the newly created Gui
+         */
         template<typename G, typename ...Args>
         std::unique_ptr<tsl::Gui>& changeTo(Args&&... args) {
             auto newGui = std::make_unique<G>(std::forward<Args>(args)...);
@@ -1137,6 +1683,12 @@ namespace tsl {
             return this->m_guiStack.back();
         }
 
+        /**
+         * @brief Changes to a different Gui
+         * 
+         * @param gui Gui to change to
+         * @return Reference to the Gui
+         */
         std::unique_ptr<tsl::Gui>& changeTo(std::unique_ptr<tsl::Gui>&& gui) {
             gui->m_topElement = gui->createUI();
             gui->requestFocus(gui->m_topElement, FocusDirection::None);
@@ -1146,7 +1698,10 @@ namespace tsl {
             return this->m_guiStack.back();
         }
 
-
+        /**
+         * @brief Pops the top Gui from the stack and goes back to the last one
+         * @note The Overlay gets closes once there are no more Guis on the stack
+         */
         void goBack() {
             if (this->m_guiStack.size() > 0)
                 this->m_guiStack.pop_back();
@@ -1166,14 +1721,44 @@ namespace tsl {
 
         bool m_disableNextAnimation = false;
 
+        /**
+         * @brief Initializes the Renderer
+         * 
+         */
         virtual void initScreen() final {
             gfx::Renderer::get().init();
         }
 
+        /**
+         * @brief Exits the Renderer
+         * 
+         */
         virtual void exitScreen() final {
             gfx::Renderer::get().exit();
         }
 
+        /**
+         * @brief Weather or not the Gui should get hidden
+         * 
+         * @return should hide 
+         */
+        virtual bool shouldHide() final {
+            return this->m_shouldHide;
+        }
+
+        /**
+         * @brief Weather or not hte Gui should get closed
+         * 
+         * @return should close
+         */
+        virtual bool shouldClose() final {
+            return this->m_shouldClose;
+        }
+
+        /**
+         * @brief Handles fade in and fade out animations of the Overlay
+         * 
+         */
         virtual void animationLoop() final {
             if (this->m_fadeInAnimationPlaying) {
                 this->m_animationCounter++;
@@ -1194,6 +1779,10 @@ namespace tsl {
             gfx::Renderer::setOpacity(0.2 * this->m_animationCounter);
         }
 
+        /**
+         * @brief Main loop
+         * 
+         */
         virtual void loop() final {
             auto& renderer = gfx::Renderer::get();
 
@@ -1207,6 +1796,16 @@ namespace tsl {
             renderer.endFrame();
         }
 
+        /**
+         * @brief Called once per frame with the latest HID inputs
+         * 
+         * @param keysDown Buttons pressed in the last frame
+         * @param keysHeld Buttons held down longer than one frame
+         * @param touchInput Last touch position
+         * @param leftJoyStick Left joystick position
+         * @param rightJoyStick Right joystick position
+         * @return Weather or not the input has been consumed
+         */
         virtual void handleInput(u64 keysDown, u64 keysHeld, touchPosition touchPos, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight) final {
             auto& currentGui = this->getCurrentGui();
             auto currentFocus = currentGui->getFocusedElement();
@@ -1245,6 +1844,10 @@ namespace tsl {
             }
         }
 
+        /**
+         * @brief Clears the screen
+         * 
+         */
         virtual void clearScreen() final {
             auto& renderer = gfx::Renderer::get();
 
@@ -1253,11 +1856,19 @@ namespace tsl {
             renderer.endFrame();
         }
 
+        /**
+         * @brief Reset hide and close flags that were previously set by \ref Overlay::close() or \ref Overlay::hide()
+         * 
+         */
         virtual void resetFlags() final {
             this->m_shouldHide = false;
             this->m_shouldClose = false;
         }
 
+        /**
+         * @brief Disables the next animation that would play
+         * 
+         */
         virtual void disableNextAnimation() final {
             this->m_disableNextAnimation = true;
         }
@@ -1270,11 +1881,11 @@ namespace tsl {
 
     
     namespace impl {
-
-        [[maybe_unused]] static LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
-            return static_cast<LaunchFlags>(u8(lhs) | u8(rhs));
-        }
-
+        
+        /**
+         * @brief Data shared between the different threads
+         * 
+         */
         struct SharedThreadData {
             bool running = false;
 
@@ -1292,6 +1903,12 @@ namespace tsl {
             JoystickPosition joyStickPosLeft = { 0 }, joyStickPosRight = { 0 };
         };
 
+
+        /**
+         * @brief Parses the Tesla settings
+         * 
+         * @param[out] launchCombo Overlay launch button combo
+         */
         static void parseOverlaySettings(u64 &launchCombo) {
             FILE *configFile = fopen("sdmc:/config/tesla/config.ini", "r");
 
@@ -1306,13 +1923,19 @@ namespace tsl {
             fread(&configFileData[0], sizeof(char), configFileSize, configFile);
             fclose(configFile);
 
-            hlp::IniData parsedConfig = hlp::parseIni(configFileData);
+            hlp::IniData parsedConfig = hlp::ini::parseIni(configFileData);
 
             launchCombo = 0x00;
             for (std::string key : hlp::split(parsedConfig["tesla"]["key_combo"], '+'))
                 launchCombo |= hlp::stringToKeyCode(key);
         }
 
+        /**
+         * @brief Input polling loop thread
+         * 
+         * @tparam launchFlags Launch flags
+         * @param args Used to pass in a pointer to a \ref SharedThreadData struct
+         */
         template<impl::LaunchFlags launchFlags>
         static void hidInputPoller(void *args) {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
@@ -1386,6 +2009,12 @@ namespace tsl {
             }
         }
 
+        /**
+         * @brief Home button detection loop thread
+         * @note This makes sure that focus cannot glitch out when pressing the home button
+         * 
+         * @param args Used to pass in a pointer to a \ref SharedThreadData struct
+         */
         static void homeButtonDetector(void *args) {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
@@ -1406,6 +2035,12 @@ namespace tsl {
 
         }
 
+        /**
+         * @brief Power button detection loop thread
+         * @note This makes sure that focus cannot glitch out when pressing the power button
+         * 
+         * @param args Used to pass in a pointer to a \ref SharedThreadData struct
+         */
         static void powerButtonDetector(void *args) {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
@@ -1428,8 +2063,16 @@ namespace tsl {
 
     }
 
-
-
+    /**
+     * @brief libtesla's main function
+     * @note Call it directly from main passing in argc and argv and returning it e.g `return tsl::loop<OverlayTest>(argc, argv);`
+     * 
+     * @tparam TOverlay Your overlay class
+     * @tparam launchFlags \ref LaunchFlags
+     * @param argc argc
+     * @param argv argv
+     * @return int result
+     */
     template<typename TOverlay, impl::LaunchFlags launchFlags>   
     static inline int loop(int argc, char** argv) {
         static_assert(std::is_base_of_v<tsl::Overlay, TOverlay>, "tsl::loop expects a type derived from tsl::Overlay");
@@ -1450,7 +2093,7 @@ namespace tsl {
         auto& overlay = shData.overlay;
         overlay = std::make_unique<TOverlay>();
 
-        overlay->initServices();
+        tsl::hlp::doWithSmSession([&overlay]{ overlay->initServices(); });
         overlay->initScreen();
         overlay->changeTo(overlay->loadInitialGui());
 
@@ -1519,12 +2162,14 @@ namespace tsl {
 #ifdef TESLA_INIT_IMPL
 
 namespace tsl::cfg {
+
     u16 LayerWidth  = 0;
     u16 LayerHeight = 0;
     u16 LayerPosX   = 0;
     u16 LayerPosY   = 0;
     u16 FramebufferWidth  = 0;
     u16 FramebufferHeight = 0;
+
 }
 
 extern "C" {
@@ -1533,6 +2178,10 @@ extern "C" {
     u32  __nx_nv_transfermem_size = 0x40000;
     ViLayerFlags __nx_vi_stray_layer_flags = (ViLayerFlags)0;
 
+    /**
+     * @brief libtesla service initializing function to override libnx's
+     * 
+     */
     void __appInit(void) {
         tsl::hlp::doWithSmSession([]{
             ASSERT_FATAL(fsInitialize());
@@ -1545,6 +2194,10 @@ extern "C" {
         });
     }
 
+    /**
+     * @brief libtesla service exiting function to override libnx's
+     * 
+     */
     void __appExit(void) {
         fsExit();
         hidExit();
