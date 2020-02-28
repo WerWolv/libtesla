@@ -34,6 +34,8 @@
 #include <mutex>
 #include <memory>
 #include <chrono>
+#include <list>
+#include <stack>
 #include <map>
 
 
@@ -1623,7 +1625,7 @@ namespace tsl {
          * @return Current Gui reference
          */
         virtual std::unique_ptr<tsl::Gui>& getCurrentGui() final {
-            return this->m_guiStack[this->m_guiStack.size() - 1];
+            return this->m_guiStack.top();
         }
 
         /**
@@ -1700,9 +1702,9 @@ namespace tsl {
             newGui->m_topElement = newGui->createUI();
             newGui->requestFocus(newGui->m_topElement, FocusDirection::None);
 
-            this->m_guiStack.push_back(std::move(newGui));
+            this->m_guiStack.push(std::move(newGui));
 
-            return this->m_guiStack.back();
+            return this->m_guiStack.top();
         }
 
         /**
@@ -1715,9 +1717,9 @@ namespace tsl {
             gui->m_topElement = gui->createUI();
             gui->requestFocus(gui->m_topElement, FocusDirection::None);
 
-            this->m_guiStack.push_back(std::move(gui));
+            this->m_guiStack.push(std::move(gui));
 
-            return this->m_guiStack.back();
+            return this->m_guiStack.top();
         }
 
         /**
@@ -1725,17 +1727,17 @@ namespace tsl {
          * @note The Overlay gets closes once there are no more Guis on the stack
          */
         void goBack() {
-            if (this->m_guiStack.size() > 0)
-                this->m_guiStack.pop_back();
+            if (!this->m_guiStack.empty())
+                this->m_guiStack.pop();
 
-            if (this->m_guiStack.size() == 0)
+            if (this->m_guiStack.empty())
                 this->close();
         }
 
-    private:    
+    private:
+        using GuiPtr = std::unique_ptr<tsl::Gui>;
+        std::stack<GuiPtr, std::list<GuiPtr>> m_guiStack;
         static inline Overlay *s_overlayInstance = nullptr;
-
-        std::vector<std::unique_ptr<tsl::Gui>> m_guiStack;
         
         bool m_fadeInAnimationPlaying = true, m_fadeOutAnimationPlaying = false;
         u8 m_animationCounter = 0;
