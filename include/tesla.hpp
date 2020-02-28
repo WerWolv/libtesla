@@ -108,16 +108,17 @@ namespace tsl {
          */
         enum class LaunchFlags : u8 {
             None = 0,                       ///< Do nothing special at launch
-            SkipComboInitially = BIT(0)     ///< Immediately open overlay when launched. Should be used for anything that isn't the default menu
+            SkipComboInitially = BIT(0),    ///< Immediately open overlay when launched. Should be used for anything that isn't the default menu
+            CloseOnExit        = BIT(1)     ///< Close the overlay the last Gui gets poped from the stack
         };
 
-        [[maybe_unused]] static LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
+        [[maybe_unused]] static constexpr LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
             return static_cast<LaunchFlags>(u8(lhs) | u8(rhs));
         }
 
     }
 
-    template<typename TOverlay, impl::LaunchFlags launchFlags = impl::LaunchFlags::SkipComboInitially>   
+    template<typename TOverlay, impl::LaunchFlags launchFlags = impl::LaunchFlags::SkipComboInitially | impl::LaunchFlags::CloseOnExit>   
     int loop(int argc, char** argv);
 
     // Helpers
@@ -1671,6 +1672,11 @@ namespace tsl {
             this->m_shouldClose = true;
         }
 
+        /**
+         * @brief Gets the Overlay instance
+         * 
+         * @return Overlay instance
+         */
         static inline Overlay* const get() {
             return Overlay::s_overlayInstance;
         }
@@ -1688,52 +1694,6 @@ namespace tsl {
             return std::move(std::make_unique<T>(args...));
         }
 
-        /**
-         * @brief Creates a new Gui and changes to it
-         * 
-         * @tparam G Gui to create 
-         * @tparam Args Arguments to pass to the Gui
-         * @param args Arguments to pass to the Gui
-         * @return Reference to the newly created Gui
-         */
-        template<typename G, typename ...Args>
-        std::unique_ptr<tsl::Gui>& changeTo(Args&&... args) {
-            auto newGui = std::make_unique<G>(std::forward<Args>(args)...);
-            newGui->m_topElement = newGui->createUI();
-            newGui->requestFocus(newGui->m_topElement, FocusDirection::None);
-
-            this->m_guiStack.push(std::move(newGui));
-
-            return this->m_guiStack.top();
-        }
-
-        /**
-         * @brief Changes to a different Gui
-         * 
-         * @param gui Gui to change to
-         * @return Reference to the Gui
-         */
-        std::unique_ptr<tsl::Gui>& changeTo(std::unique_ptr<tsl::Gui>&& gui) {
-            gui->m_topElement = gui->createUI();
-            gui->requestFocus(gui->m_topElement, FocusDirection::None);
-
-            this->m_guiStack.push(std::move(gui));
-
-            return this->m_guiStack.top();
-        }
-
-        /**
-         * @brief Pops the top Gui from the stack and goes back to the last one
-         * @note The Overlay gets closes once there are no more Guis on the stack
-         */
-        void goBack() {
-            if (!this->m_guiStack.empty())
-                this->m_guiStack.pop();
-
-            if (this->m_guiStack.empty())
-                this->close();
-        }
-
     private:
         using GuiPtr = std::unique_ptr<tsl::Gui>;
         std::stack<GuiPtr, std::list<GuiPtr>> m_guiStack;
@@ -1746,6 +1706,8 @@ namespace tsl {
         bool m_shouldClose = false;
 
         bool m_disableNextAnimation = false;
+
+        bool m_closeOnExit;
 
         /**
          * @brief Initializes the Renderer
@@ -1898,6 +1860,59 @@ namespace tsl {
         virtual void disableNextAnimation() final {
             this->m_disableNextAnimation = true;
         }
+
+                /**
+         * @brief Creates a new Gui and changes to it
+         * 
+         * @tparam G Gui to create 
+         * @tparam Args Arguments to pass to the Gui
+         * @param args Arguments to pass to the Gui
+         * @return Reference to the newly created Gui
+         */
+        template<typename G, typename ...Args>
+        std::unique_ptr<tsl::Gui>& changeTo(Args&&... args) {
+            auto newGui = std::make_unique<G>(std::forward<Args>(args)...);
+            newGui->m_topElement = newGui->createUI();
+            newGui->requestFocus(newGui->m_topElement, FocusDirection::None);
+
+            this->m_guiStack.push(std::move(newGui));
+
+            return this->m_guiStack.top();
+        }
+
+        /**
+         * @brief Changes to a different Gui
+         * 
+         * @param gui Gui to change to
+         * @return Reference to the Gui
+         */
+        std::unique_ptr<tsl::Gui>& changeTo(std::unique_ptr<tsl::Gui>&& gui) {
+            gui->m_topElement = gui->createUI();
+            gui->requestFocus(gui->m_topElement, FocusDirection::None);
+
+            this->m_guiStack.push(std::move(gui));
+
+            return this->m_guiStack.top();
+        }
+
+        /**
+         * @brief Pops the top Gui from the stack and goes back to the last one
+         * @note The Overlay gets closes once there are no more Guis on the stack
+         */
+        void goBack() {
+            if (!this->m_closeOnExit && this->m_guiStack.size() == 1)
+                return;
+
+            if (!this->m_guiStack.empty())
+                this->m_guiStack.pop();
+
+            if (this->m_guiStack.empty())
+                this->close();
+        }
+
+        template<typename G, typename ...Args>
+        friend std::unique_ptr<tsl::Gui>& changeTo(Args&&... args);
+        friend void goBack();
 
         template<typename, tsl::impl::LaunchFlags>
         friend int loop(int argc, char** argv);
@@ -2088,6 +2103,29 @@ namespace tsl {
     }
 
     /**
+     * @brief Creates a new Gui and changes to it
+     * 
+     * @tparam G Gui to create 
+     * @tparam Args Arguments to pass to the Gui
+     * @param args Arguments to pass to the Gui
+     * @return Reference to the newly created Gui
+     */
+    template<typename G, typename ...Args>
+    std::unique_ptr<tsl::Gui>& changeTo(Args&&... args) {
+        return Overlay::get()->changeTo<G, Args...>(args...);
+    }
+
+    /**
+     * @brief Pops the top Gui from the stack and goes back to the last one
+     * @note The Overlay gets closes once there are no more Guis on the stack
+     */
+    void goBack() {
+        Overlay::get()->goBack();
+    }
+
+
+
+    /**
      * @brief libtesla's main function
      * @note Call it directly from main passing in argc and argv and returning it e.g `return tsl::loop<OverlayTest>(argc, argv);`
      * 
@@ -2115,6 +2153,7 @@ namespace tsl {
 
         auto& overlay = tsl::Overlay::s_overlayInstance;
         overlay = new TOverlay();
+        overlay->m_closeOnExit = (u8(launchFlags) & u8(impl::LaunchFlags::CloseOnExit)) == u8(impl::LaunchFlags::CloseOnExit);
 
         tsl::hlp::doWithSmSession([&overlay]{ overlay->initServices(); });
         overlay->initScreen();
