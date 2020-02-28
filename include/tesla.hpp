@@ -1669,7 +1669,10 @@ namespace tsl {
             this->m_shouldClose = true;
         }
 
-    protected:
+        static inline Overlay* const get() {
+            return Overlay::s_overlayInstance;
+        }
+
         /**
          * @brief Creates the initial Gui of an Overlay and moves the object to the Gui stack
          * 
@@ -1679,7 +1682,7 @@ namespace tsl {
          * @return constexpr std::unique_ptr<T> 
          */
         template<typename T, typename ... Args>
-        constexpr inline std::unique_ptr<T> initially(Args ... args) {
+        constexpr inline std::unique_ptr<T> initially(Args&&... args) {
             return std::move(std::make_unique<T>(args...));
         }
 
@@ -1729,7 +1732,9 @@ namespace tsl {
                 this->close();
         }
 
-    private:       
+    private:    
+        static inline Overlay *s_overlayInstance = nullptr;
+
         std::vector<std::unique_ptr<tsl::Gui>> m_guiStack;
         
         bool m_fadeInAnimationPlaying = true, m_fadeOutAnimationPlaying = false;
@@ -1910,8 +1915,6 @@ namespace tsl {
 
             Event comboEvent = { 0 }, homeButtonPressEvent = { 0 }, powerButtonPressEvent = { 0 };
 
-            std::unique_ptr<Overlay> overlay;
-
             u64 launchCombo = KEY_L | KEY_DDOWN | KEY_RSTICK;
             bool overlayOpen = false;
 
@@ -2009,7 +2012,7 @@ namespace tsl {
 
                 if (((shData->keysHeld & shData->launchCombo) == shData->launchCombo) && shData->keysDown & shData->launchCombo) {
                     if (shData->overlayOpen) {
-                        shData->overlay->hide();
+                        tsl::Overlay::get()->hide();
                         shData->overlayOpen = false;
                     }
                     else
@@ -2018,7 +2021,7 @@ namespace tsl {
 
                 if (shData->touchPos.px >= cfg::FramebufferWidth && shData->overlayOpen) {
                     if (shData->overlayOpen) {
-                        shData->overlay->hide();
+                        tsl::Overlay::get()->hide();
                         shData->overlayOpen = false;
                     }
                 }
@@ -2046,7 +2049,7 @@ namespace tsl {
                     eventClear(&shData->homeButtonPressEvent);
 
                     if (shData->overlayOpen) {
-                        shData->overlay->hide();
+                        tsl::Overlay::get()->hide();
                         shData->overlayOpen = false;
                     }
                 }
@@ -2072,7 +2075,7 @@ namespace tsl {
                     eventClear(&shData->powerButtonPressEvent);
 
                     if (shData->overlayOpen) {
-                        shData->overlay->hide();
+                        tsl::Overlay::get()->hide();
                         shData->overlayOpen = false;
                     }
                 }
@@ -2108,9 +2111,8 @@ namespace tsl {
         threadStart(&homeButtonDetectorThread);
         threadStart(&powerButtonDetectorThread);
 
-
-        auto& overlay = shData.overlay;
-        overlay = std::make_unique<TOverlay>();
+        auto& overlay = tsl::Overlay::s_overlayInstance;
+        overlay = new TOverlay();
 
         tsl::hlp::doWithSmSession([&overlay]{ overlay->initServices(); });
         overlay->initScreen();
@@ -2171,6 +2173,8 @@ namespace tsl {
 
         overlay->exitScreen();
         overlay->exitServices();
+
+        delete overlay;
         
         return 0;
     }
