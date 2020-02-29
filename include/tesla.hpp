@@ -1255,6 +1255,7 @@ namespace tsl {
                     this->m_state = !this->m_state;
 
                     this->setState(this->m_state);
+                    this->m_stateChangedListener(this->m_state);
 
                     return true;
                 }
@@ -1283,8 +1284,6 @@ namespace tsl {
                     this->setValue(this->m_onValue, false);
                 else
                     this->setValue(this->m_offValue, true);
-
-                this->m_stateChangedListener(state);
             }
 
             /**
@@ -1914,8 +1913,10 @@ namespace tsl {
          * @note The Overlay gets closes once there are no more Guis on the stack
          */
         void goBack() {
-            if (!this->m_closeOnExit && this->m_guiStack.size() == 1)
+            if (!this->m_closeOnExit && this->m_guiStack.size() == 1) {
+                this->hide();
                 return;
+            }
 
             if (!this->m_guiStack.empty())
                 this->m_guiStack.pop();
