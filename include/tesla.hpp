@@ -108,8 +108,7 @@ namespace tsl {
          */
         enum class LaunchFlags : u8 {
             None = 0,                       ///< Do nothing special at launch
-            SkipComboInitially = BIT(0),    ///< Immediately open overlay when launched. Should be used for anything that isn't the default menu
-            CloseOnExit        = BIT(1)     ///< Close the overlay the last Gui gets poped from the stack
+            CloseOnExit        = BIT(0)     ///< Close the overlay the last Gui gets poped from the stack
         };
 
         [[maybe_unused]] static constexpr LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
@@ -118,7 +117,7 @@ namespace tsl {
 
     }
 
-    template<typename TOverlay, impl::LaunchFlags launchFlags = impl::LaunchFlags::SkipComboInitially | impl::LaunchFlags::CloseOnExit>   
+    template<typename TOverlay, impl::LaunchFlags launchFlags = impl::LaunchFlags::CloseOnExit>   
     int loop(int argc, char** argv);
 
     // Helpers
@@ -1978,12 +1977,7 @@ namespace tsl {
         template<impl::LaunchFlags launchFlags>
         static void hidInputPoller(void *args) {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
-
-            eventCreate(&shData->comboEvent, false);
             
-            if constexpr (u8(launchFlags) & u8(impl::LaunchFlags::SkipComboInitially))
-                eventFire(&shData->comboEvent);
-
             // Parse Tesla settings
             impl::parseOverlaySettings(shData->launchCombo);
 
@@ -2123,6 +2117,13 @@ namespace tsl {
         Overlay::get()->goBack();
     }
 
+    void setNextOverlay(std::string ovlPath, std::string args = "") {
+
+        args += " --skipCombo";
+
+        envSetNextLoad(ovlPath.c_str(), args.c_str());
+    }
+
 
 
     /**
@@ -2151,6 +2152,10 @@ namespace tsl {
         threadStart(&homeButtonDetectorThread);
         threadStart(&powerButtonDetectorThread);
 
+        eventCreate(&shData.comboEvent, false);
+
+
+
         auto& overlay = tsl::Overlay::s_overlayInstance;
         overlay = new TOverlay();
         overlay->m_closeOnExit = (u8(launchFlags) & u8(impl::LaunchFlags::CloseOnExit)) == u8(impl::LaunchFlags::CloseOnExit);
@@ -2159,8 +2164,15 @@ namespace tsl {
         overlay->initScreen();
         overlay->changeTo(overlay->loadInitialGui());
 
-        if (u8(launchFlags) & u8(impl::LaunchFlags::SkipComboInitially))
-            overlay->disableNextAnimation();
+        
+        // Argument parsing
+        for (u8 arg = 0; arg < argc; arg++) {
+            if (strcasecmp(argv[arg], "--skipCombo")) {
+                eventFire(&shData.comboEvent);
+                overlay->disableNextAnimation();
+            }
+        }
+
 
         while (shData.running) {
             
