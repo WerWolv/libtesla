@@ -1367,9 +1367,7 @@ namespace tsl {
             /**
              * @brief Removes all children from the list
              */
-            virtual void clear() final {
-                Overlay::get()->getCurrentGui()->removeFocus();
-                
+            virtual void clear() final {              
                 for (auto& item : this->m_items)
                     delete item.element;
 
