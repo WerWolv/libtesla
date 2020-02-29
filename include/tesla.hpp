@@ -1899,8 +1899,10 @@ namespace tsl {
          * @note The Overlay gets closes once there are no more Guis on the stack
          */
         void goBack() {
-            if (!this->m_closeOnExit && this->m_guiStack.size() == 1)
+            if (!this->m_closeOnExit && this->m_guiStack.size() == 1) {
+                this->hide();
                 return;
+            }
 
             if (!this->m_guiStack.empty())
                 this->m_guiStack.pop();
