@@ -1360,7 +1360,22 @@ namespace tsl {
                     this->m_items.push_back({ element, height });
                     this->invalidate();
                 }
+
+                if (this->m_items.size() == 1)
+                    this->requestFocus(nullptr, FocusDirection::None);
             }   
+
+            /**
+             * @brief Removes all children from the list
+             */
+            virtual void clear() final {
+                Overlay::get()->getCurrentGui()->removeFocus();
+                
+                for (auto& item : this->m_items)
+                    delete item.element;
+
+                this->m_items.clear();
+            }
 
             virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
                 if (this->m_items.size() == 0)
