@@ -2132,7 +2132,7 @@ namespace tsl {
      */
     template<typename G, typename ...Args>
     std::unique_ptr<tsl::Gui>& changeTo(Args&&... args) {
-        return Overlay::get()->changeTo<G, Args...>(args...);
+        return Overlay::get()->changeTo<G, Args...>(std::forward<Args>(args)...);
     }
 
     /**
