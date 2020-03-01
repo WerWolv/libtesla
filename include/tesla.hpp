@@ -1837,6 +1837,9 @@ namespace tsl {
                 parentElement = parentElement->getParent();
             } while (!handled && parentElement != nullptr);
 
+            if (currentGui != this->getCurrentGui())
+                return;
+
             handled = handled | currentGui->handleInput(keysDown, keysHeld, touchPos, joyStickPosLeft, joyStickPosRight);
 
             if (!handled) {
