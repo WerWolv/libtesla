@@ -1675,6 +1675,15 @@ namespace tsl {
         }
 
         /**
+         * @brief Returns whether fade animation is playing
+         *
+         * @return whether fade animation is playing
+         */
+        virtual bool fadeAnimationPlaying() final {
+            return this->m_fadeInAnimationPlaying || this->m_fadeOutAnimationPlaying;
+        }
+
+        /**
          * @brief Closes the Gui
          * @note This makes the Tesla overlay exit and return back to the Tesla-Menu
          * 
@@ -1950,6 +1959,7 @@ namespace tsl {
 
             std::mutex dataMutex;
             u64 keysDown = 0;
+            u64 keysDownPending = 0;
             u64 keysHeld = 0;
             touchPosition touchPos = { 0 };
             JoystickPosition joyStickPosLeft = { 0 }, joyStickPosRight = { 0 };
@@ -2033,22 +2043,23 @@ namespace tsl {
                     hidJoystickRead(&shData->joyStickPosLeft, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_LEFT);
                     hidJoystickRead(&shData->joyStickPosRight, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_RIGHT);
 
-                }
-
-                if (((shData->keysHeld & shData->launchCombo) == shData->launchCombo) && shData->keysDown & shData->launchCombo) {
-                    if (shData->overlayOpen) {
-                        tsl::Overlay::get()->hide();
-                        shData->overlayOpen = false;
+                    if (((shData->keysHeld & shData->launchCombo) == shData->launchCombo) && shData->keysDown & shData->launchCombo) {
+                        if (shData->overlayOpen) {
+                            tsl::Overlay::get()->hide();
+                            shData->overlayOpen = false;
+                        }
+                        else
+                            eventFire(&shData->comboEvent);
                     }
-                    else
-                        eventFire(&shData->comboEvent);
-                }
 
-                if (shData->touchPos.px >= cfg::FramebufferWidth && shData->overlayOpen) {
-                    if (shData->overlayOpen) {
-                        tsl::Overlay::get()->hide();
-                        shData->overlayOpen = false;
+                    if (shData->touchPos.px >= cfg::FramebufferWidth && shData->overlayOpen) {
+                        if (shData->overlayOpen) {
+                            tsl::Overlay::get()->hide();
+                            shData->overlayOpen = false;
+                        }
                     }
+
+                    shData->keysDownPending |= shData->keysDown;
                 }
 
                 //20 ms
@@ -2205,10 +2216,10 @@ namespace tsl {
 
                 {
                     std::scoped_lock lock(shData.dataMutex);
-                    overlay->handleInput(shData.keysDown, shData.keysHeld, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
-
-                    shData.keysDown = 0x00;
-                    shData.keysHeld = 0x00;
+                    if (!overlay->fadeAnimationPlaying()) {
+                        overlay->handleInput(shData.keysDownPending, shData.keysHeld, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
+                    }
+                    shData.keysDownPending = 0;
                 }
 
                 if (overlay->shouldHide())
