@@ -357,8 +357,8 @@ namespace tsl {
              * @param y Y pos
              * @param color Color
              */
-            inline void setPixel(u16 x, u16 y, Color color) {
-                if (x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
+            inline void setPixel(s16 x, s16 y, Color color) {
+                if (x < 0 || y < 0 || x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
                     return;
 
                 static_cast<Color*>(this->getCurrentFramebuffer())[this->getPixelOffset(x, y)] = color;
@@ -385,8 +385,8 @@ namespace tsl {
              * @param y Y pos
              * @param color Color
              */
-            inline void setPixelBlendSrc(u16 x, u16 y, Color color) {
-                if (x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
+            inline void setPixelBlendSrc(s16 x, s16 y, Color color) {
+                if (x < 0 || y < 0 || x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
                     return;
 
                 Color src((static_cast<u16*>(this->getCurrentFramebuffer()))[this->getPixelOffset(x, y)]);
@@ -408,8 +408,8 @@ namespace tsl {
              * @param y Y pos
              * @param color Color
              */
-            inline void setPixelBlendDst(u16 x, u16 y, Color color) {
-                if (x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
+            inline void setPixelBlendDst(s16 x, s16 y, Color color) {
+                if (x < 0 || y < 0 || x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
                     return;
 
                 Color src((static_cast<u16*>(this->getCurrentFramebuffer()))[this->getPixelOffset(x, y)]);
@@ -433,7 +433,7 @@ namespace tsl {
              * @param h Height
              * @param color Color
              */
-            inline void drawRect(u16 x, u16 y, u16 w, u16 h, Color color) {
+            inline void drawRect(s16 x, s16 y, s16 w, s16 h, Color color) {
                 for (s16 x1 = x; x1 < (x + w); x1++)
                     for (s16 y1 = y; y1 < (y + h); y1++)
                         this->setPixelBlendDst(x1, y1, color);
@@ -781,7 +781,7 @@ namespace tsl {
              * @param font STB Font to use
              * @param fontSize Font size
              */
-            inline void drawGlyph(s32 codepoint, u32 x, u32 y, Color color, stbtt_fontinfo *font, float fontSize) {
+            inline void drawGlyph(s32 codepoint, s32 x, s32 y, Color color, stbtt_fontinfo *font, float fontSize) {
                 int width = 10, height = 10;
 
                 u8 *glyphBmp = stbtt_GetCodepointBitmap(font, fontSize, fontSize, codepoint, &width, &height, nullptr, nullptr);
