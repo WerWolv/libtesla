@@ -1323,9 +1323,10 @@ namespace tsl {
             virtual void draw(gfx::Renderer *renderer) override {
                 u16 i = 0;
                 for (auto &entry : this->m_items) {
+                    if (i >= this->m_offset && i < this->m_offset + this->m_entriesShown) {
+                        entry.element->frame(renderer);
+                    }
                     i++;
-                    if (i < this->m_offset || i > this->m_entriesShown + this->m_offset) continue;
-                    entry.element->frame(renderer);
                 }
             }
 
@@ -1333,12 +1334,12 @@ namespace tsl {
                 u16 y = this->getY();
                 u16 i = 0;
                 for (auto &entry : this->m_items) {
+                    if (i >= this->m_offset && i < this->m_offset + this->m_entriesShown) {
+                        entry.element->setBoundaries(this->getX(), y, this->getWidth(), entry.height);
+                        entry.element->invalidate();
+                        y += entry.height;
+                    }
                     i++;
-                    if (i < this->m_offset || i > this->m_entriesShown + this->m_offset) continue;
-                    entry.element->setBoundaries(this->getX(), y, this->getWidth(), entry.height);
-                    entry.element->invalidate();
-
-                    y += entry.height;
                 }
             }
 
@@ -1387,27 +1388,27 @@ namespace tsl {
                     if (it == this->m_items.begin())
                         return this->m_items[0].element;
                     else {
-                        if (oldFocus == (this->m_items.begin() + this->m_offset)->element)
-                            if (this->m_offset > 1) {
+                        // old focus on the second item, and has offset
+                        if (oldFocus == (this->m_items.begin() + this->m_offset + 1)->element) {
+                            if (this->m_offset > 0) {
                                 this->m_offset--;
                                 this->invalidate();
                             }
-
+                        }
                         return (it - 1)->element;
                     }
                 } else if (direction == FocusDirection::Down) {
                     if (it == (this->m_items.end() - 1)) {
-                        if (this->m_items.size() > 0)
-                            return this->m_items[this->m_items.size() - 1].element;
-                        else return nullptr;
+                        return this->m_items[this->m_items.size() - 1].element;
                     }
                     else {
-                        // there are more items hidden and old focus was on second last item
-                        if (this->m_items.size() > size_t(this->m_offset + this->m_entriesShown) && oldFocus == (this->m_items.begin() + this->m_offset + this->m_entriesShown - 2)->element) {
-                            this->m_offset++;
-                            this->invalidate();
+                        // old focus on second to last item, and has more items hidden
+                        if (oldFocus == (this->m_items.begin() + this->m_offset + this->m_entriesShown - 2)->element) {
+                            if (this->m_items.size() > this->m_offset + this->m_entriesShown) {
+                                this->m_offset++;
+                                this->invalidate();
+                            }
                         }
-
                         return (it + 1)->element;
                     }
                 }
@@ -1428,7 +1429,7 @@ namespace tsl {
             std::vector<ListEntry> m_items;
             u16 m_focusedElement = 0;
 
-            u16 m_offset = 1;
+            u16 m_offset = 0;
             u16 m_entriesShown = 5;
         };
 
