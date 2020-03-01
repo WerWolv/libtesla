@@ -117,6 +117,10 @@ namespace tsl {
 
     }
 
+    [[maybe_unused]] static void goBack();
+
+    [[maybe_unused]] static void setNextOverlay(std::string ovlPath, std::string args = "");
+
     template<typename TOverlay, impl::LaunchFlags launchFlags = impl::LaunchFlags::CloseOnExit>   
     int loop(int argc, char** argv);
 
@@ -1938,6 +1942,7 @@ namespace tsl {
 
         template<typename G, typename ...Args>
         friend std::unique_ptr<tsl::Gui>& changeTo(Args&&... args);
+
         friend void goBack();
 
         template<typename, tsl::impl::LaunchFlags>
@@ -2142,11 +2147,11 @@ namespace tsl {
      * @brief Pops the top Gui from the stack and goes back to the last one
      * @note The Overlay gets closes once there are no more Guis on the stack
      */
-    void goBack() {
+    static void goBack() {
         Overlay::get()->goBack();
     }
 
-    void setNextOverlay(std::string ovlPath, std::string args = "") {
+    static void setNextOverlay(std::string ovlPath, std::string args) {
 
         args += " --skipCombo";
 
