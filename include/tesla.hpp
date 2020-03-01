@@ -1082,7 +1082,7 @@ namespace tsl {
              * @param subtitle Subtitle drawn bellow the title e.g version number
              */
             OverlayFrame(std::string title, std::string subtitle) : Element(), m_title(title), m_subtitle(subtitle) {}
-            ~OverlayFrame() {
+            virtual ~OverlayFrame() {
                 if (this->m_contentElement != nullptr)
                     delete this->m_contentElement;
             }
@@ -1151,7 +1151,7 @@ namespace tsl {
              * @param color Color of the rectangle
              */
             DebugRectangle(gfx::Color color) : Element(), m_color(color) {}
-            ~DebugRectangle() {}
+            virtual ~DebugRectangle() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a(this->m_color));
@@ -1175,7 +1175,7 @@ namespace tsl {
              * @param text Initial description text
              */
             ListItem(std::string text) : Element(), m_text(text) {}
-            ~ListItem() {}
+            virtual ~ListItem() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
                 if (this->m_valueWidth == 0) {
@@ -1248,7 +1248,7 @@ namespace tsl {
                 this->setState(this->m_state);
             }
 
-            ~ToggleListItem() {}
+            virtual ~ToggleListItem() {}
 
             virtual bool onClick(u64 keys) {
                 if (keys & KEY_A) {
@@ -1315,7 +1315,7 @@ namespace tsl {
              * @param entriesShown Amount of items displayed in the list at once before scrolling starts
              */
             List(u16 entriesShown = 5) : Element(), m_entriesShown(entriesShown) {}
-            ~List() {
+            virtual ~List() {
                 for (auto& item : this->m_items)
                     delete item.element;
             }
@@ -1445,7 +1445,7 @@ namespace tsl {
                  * @param renderFunc Callback that will be called once every frame to draw this view
                  */
                 CustomDrawer(std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> renderFunc) : Element(), m_renderFunc(renderFunc) {}
-                ~CustomDrawer() {}
+                virtual ~CustomDrawer() {}
 
                 virtual void draw(gfx::Renderer* renderer) override {
                     this->m_renderFunc(renderer, this->getX(), this->getY(), this->getWidth(), this->getHeight());
