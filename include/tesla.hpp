@@ -56,6 +56,8 @@
 
 #define ASSERT_EXIT(x) if (R_FAILED(x)) std::exit(1)
 #define ASSERT_FATAL(x) if (Result res = x; R_FAILED(res)) fatalThrow(res)
+	
+u8 TeslaFPS = 1;
 
 using namespace std::literals::chrono_literals;
 
@@ -765,6 +767,7 @@ namespace tsl {
              */
             inline void endFrame() {
                 std::memcpy(this->getNextFramebuffer(), this->getCurrentFramebuffer(), this->getFramebufferSize());
+				svcSleepThread(1000*1000*1000 / TeslaFPS);
                 this->waitForVSync();
                 framebufferEnd(&this->m_framebuffer);
 
@@ -1098,7 +1101,6 @@ namespace tsl {
                 renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(0xFFFF));
 
                 renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
-                renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
 
                 if (this->m_contentElement != nullptr)
                     this->m_contentElement->frame(renderer);
@@ -1655,7 +1657,7 @@ namespace tsl {
                 this->m_disableNextAnimation = false;
             }
             else {
-                this->m_fadeInAnimationPlaying = true;
+                this->m_fadeInAnimationPlaying = false;
                 this->m_animationCounter = 0;
             }
 
@@ -1672,7 +1674,7 @@ namespace tsl {
                 this->m_disableNextAnimation = false;
             }
             else {
-                this->m_fadeOutAnimationPlaying = true;
+                this->m_fadeOutAnimationPlaying = false;
                 this->m_animationCounter = 5;
             }
 
@@ -1825,9 +1827,6 @@ namespace tsl {
 
             if (currentFocus == nullptr) {
                 if (elm::Element* topElement = currentGui->getTopElement(); topElement == nullptr) {
-                    if (keysDown & KEY_B) 
-                        this->goBack();
-
                     return;
                 }
                 else
@@ -1855,8 +1854,6 @@ namespace tsl {
                     currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Left);
                 else if (keysDown & KEY_RIGHT)
                     currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Right);
-                else if (keysDown & KEY_B) 
-                    this->goBack();
             }
         }
 
