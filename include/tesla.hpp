@@ -959,8 +959,6 @@ namespace tsl {
                     }
                 }
 
-                renderer->drawRect(this->m_x, this->m_y, this->m_width, this->m_height, a(0xF000));
-
                 renderer->drawRect(this->m_x + x - 4, this->m_y + y - 4, this->m_width + 8, 4, a(highlightColor));
                 renderer->drawRect(this->m_x + x - 4, this->m_y + y + this->m_height, this->m_width + 8, 4, a(highlightColor));
                 renderer->drawRect(this->m_x + x - 4, this->m_y + y, 4, this->m_height, a(highlightColor));
