@@ -2,3 +2,11 @@ debug
 release
 lib
 *.bz2
+
+example/build/
+
+*.elf
+
+*.nacp
+
+*.ovl
