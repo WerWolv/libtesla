@@ -1100,7 +1100,8 @@ namespace tsl {
                 renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(0xFFFF));
                 renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(0xFFFF));
 
-                renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
+                if (TeslaFPS == (60 || 5 || 1)) renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
+				if (TeslaFPS == 60) renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
 
                 if (this->m_contentElement != nullptr)
                     this->m_contentElement->frame(renderer);
@@ -1379,8 +1380,6 @@ namespace tsl {
                     delete item.element;
 
                 this->m_items.clear();
-                this->m_offset = 0;
-                this->m_focusedElement = 0;
             }
 
             virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
