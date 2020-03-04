@@ -58,6 +58,7 @@
 #define ASSERT_FATAL(x) if (Result res = x; R_FAILED(res)) fatalThrow(res)
 	
 u8 TeslaFPS = 1;
+u8 alphabackground = 0xD;
 
 using namespace std::literals::chrono_literals;
 
@@ -1095,12 +1096,12 @@ namespace tsl {
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
+                renderer->fillScreen(a({ 0x0, 0x0, 0x0, alphabackground }));
 
                 renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(0xFFFF));
                 renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(0xFFFF));
 
-                if (TeslaFPS == (60 || 5 || 1)) renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
+                if ((TeslaFPS == (60 || 1)) || (TeslaFPS == 5)) renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
 				if (TeslaFPS == 60) renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
 
                 if (this->m_contentElement != nullptr)
@@ -1380,8 +1381,6 @@ namespace tsl {
                     delete item.element;
 
                 this->m_items.clear();
-				this->m_offset = 0;	
-                this->m_focusedElement = 0;
             }
 
             virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
