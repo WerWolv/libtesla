@@ -1379,6 +1379,8 @@ namespace tsl {
                     delete item.element;
 
                 this->m_items.clear();
+                this->m_offset = 0;
+                this->m_focusedElement = 0;
             }
 
             virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
