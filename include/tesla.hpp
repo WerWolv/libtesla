@@ -57,6 +57,15 @@
 #define ASSERT_EXIT(x) if (R_FAILED(x)) std::exit(1)
 #define ASSERT_FATAL(x) if (Result res = x; R_FAILED(res)) fatalThrow(res)
 
+/// Evaluates an expression that returns a result, and returns the result if it would fail.
+#define R_TRY(res_expr)                      \
+    ({                                       \
+        const auto _tmp_r_try_rc = res_expr; \
+        if (R_FAILED(_tmp_r_try_rc)) {       \
+            return _tmp_r_try_rc;            \
+        }                                    \
+    })
+
 using namespace std::literals::chrono_literals;
 
 namespace tsl {
@@ -138,6 +147,22 @@ namespace tsl {
             f();
             smExit();
         }
+
+        /**
+         * @brief Guard that will execute a passed function at the end of the current scope
+         *
+         * @param f wrapped function
+         */
+        class ScopeGuard {
+            ScopeGuard(const ScopeGuard&) = delete;
+            ScopeGuard& operator=(const ScopeGuard&) = delete;
+            private:
+                std::function<void()> f;
+            public:
+                __attribute__((always_inline)) ScopeGuard(std::function<void()> f) : f(std::move(f)) { }
+                __attribute__((always_inline)) ~ScopeGuard() { if (f) { f(); } }
+                void dismiss() { f = nullptr; }
+        };
 
         /**
          * @brief libnx hid:sys shim that gives or takes away frocus to or from the process with the given aruid
@@ -1985,18 +2010,29 @@ namespace tsl {
          * @param[out] launchCombo Overlay launch button combo
          */
         static void parseOverlaySettings(u64 &launchCombo) {
-            FILE *configFile = fopen("sdmc:/config/tesla/config.ini", "r");
+            /* Open Sd card filesystem. */
+            FsFileSystem fs_sdmc;
+            if(R_FAILED(fsOpenSdCardFileSystem(&fs_sdmc)))
+                return;
+            hlp::ScopeGuard fsGuard([&] { fsFsClose(&fs_sdmc); });
 
-            if (configFile == nullptr)
+            /* Open config file. */
+            FsFile file_cfg;
+            if (R_FAILED(fsFsOpenFile(&fs_sdmc, "/config/tesla/config.ini", FsOpenMode_Read, &file_cfg)))
+                return;
+            hlp::ScopeGuard fileGuard([&] { fsFileClose(&file_cfg); });
+
+            /* Get config file size. */
+            s64 configFileSize;
+            if (R_FAILED(fsFileGetSize(&file_cfg, &configFileSize)))
                 return;
 
-            fseek(configFile, 0, SEEK_END);
-            size_t configFileSize = ftell(configFile);
-            rewind(configFile);
-
+            /* Read and parse config file. */
             std::string configFileData(configFileSize, '\0');
-            fread(&configFileData[0], sizeof(char), configFileSize, configFile);
-            fclose(configFile);
+            u64 readSize;
+            Result rc = fsFileRead(&file_cfg, 0, configFileData.data(), configFileSize, FsReadOption_None, &readSize);
+            if (R_FAILED(rc) || readSize != static_cast<u64>(configFileSize))
+                return;
 
             hlp::ini::IniData parsedConfig = hlp::ini::parseIni(configFileData);
 
@@ -2299,7 +2335,6 @@ extern "C" {
     void __appInit(void) {
         tsl::hlp::doWithSmSession([]{
             ASSERT_FATAL(fsInitialize());
-            ASSERT_FATAL(fsdevMountSdmc());
             ASSERT_FATAL(hidInitialize());      // Controller inputs and Touch
             ASSERT_FATAL(plInitialize());       // Font data
             ASSERT_FATAL(pmdmntInitialize());   // PID querying

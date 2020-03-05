@@ -32,7 +32,7 @@ public:
 
 class OverlayTest : public tsl::Overlay {
 public:
-                                             // libtesla already initialized fs, hid, pl, pmdmnt, hid:sys, set:sys and the SD card
+                                             // libtesla already initialized fs, hid, pl, pmdmnt, hid:sys and set:sys
     virtual void initServices() override {}  // Called at the start to initialize all services necessary for this Overlay
     virtual void exitServices() override {}  // Callet at the end to clean up all services previously initialized
 
