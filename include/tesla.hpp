@@ -58,12 +58,12 @@
 #define ASSERT_FATAL(x) if (Result res = x; R_FAILED(res)) fatalThrow(res)
 
 /// Evaluates an expression that returns a result, and returns the result if it would fail.
-#define R_TRY(res_expr)                      \
-    ({                                       \
-        const auto _tmp_r_try_rc = res_expr; \
-        if (R_FAILED(_tmp_r_try_rc)) {       \
-            return _tmp_r_try_rc;            \
-        }                                    \
+#define R_TRY(resultExpr)               \
+    ({                                  \
+        const auto result = resultExpr; \
+        if (R_FAILED(result)) {         \
+            return result;              \
+        }                               \
     })
 
 using namespace std::literals::chrono_literals;
@@ -2011,26 +2011,26 @@ namespace tsl {
          */
         static void parseOverlaySettings(u64 &launchCombo) {
             /* Open Sd card filesystem. */
-            FsFileSystem fs_sdmc;
-            if(R_FAILED(fsOpenSdCardFileSystem(&fs_sdmc)))
+            FsFileSystem fsSdmc;
+            if(R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
                 return;
-            hlp::ScopeGuard fsGuard([&] { fsFsClose(&fs_sdmc); });
+            hlp::ScopeGuard fsGuard([&] { fsFsClose(&fsSdmc); });
 
             /* Open config file. */
-            FsFile file_cfg;
-            if (R_FAILED(fsFsOpenFile(&fs_sdmc, "/config/tesla/config.ini", FsOpenMode_Read, &file_cfg)))
+            FsFile fileConfig;
+            if (R_FAILED(fsFsOpenFile(&fsSdmc, "/config/tesla/config.ini", FsOpenMode_Read, &fileConfig)))
                 return;
-            hlp::ScopeGuard fileGuard([&] { fsFileClose(&file_cfg); });
+            hlp::ScopeGuard fileGuard([&] { fsFileClose(&fileConfig); });
 
             /* Get config file size. */
             s64 configFileSize;
-            if (R_FAILED(fsFileGetSize(&file_cfg, &configFileSize)))
+            if (R_FAILED(fsFileGetSize(&fileConfig, &configFileSize)))
                 return;
 
             /* Read and parse config file. */
             std::string configFileData(configFileSize, '\0');
             u64 readSize;
-            Result rc = fsFileRead(&file_cfg, 0, configFileData.data(), configFileSize, FsReadOption_None, &readSize);
+            Result rc = fsFileRead(&fileConfig, 0, configFileData.data(), configFileSize, FsReadOption_None, &readSize);
             if (R_FAILED(rc) || readSize != static_cast<u64>(configFileSize))
                 return;
 
