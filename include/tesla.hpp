@@ -57,6 +57,15 @@
 #define ASSERT_EXIT(x) if (R_FAILED(x)) std::exit(1)
 #define ASSERT_FATAL(x) if (Result res = x; R_FAILED(res)) fatalThrow(res)
 
+/// Evaluates an expression that returns a result, and returns the result if it would fail.
+#define R_TRY(resultExpr)               \
+    ({                                  \
+        const auto result = resultExpr; \
+        if (R_FAILED(result)) {         \
+            return result;              \
+        }                               \
+    })
+
 using namespace std::literals::chrono_literals;
 
 namespace tsl {
@@ -138,6 +147,22 @@ namespace tsl {
             f();
             smExit();
         }
+
+        /**
+         * @brief Guard that will execute a passed function at the end of the current scope
+         *
+         * @param f wrapped function
+         */
+        class ScopeGuard {
+            ScopeGuard(const ScopeGuard&) = delete;
+            ScopeGuard& operator=(const ScopeGuard&) = delete;
+            private:
+                std::function<void()> f;
+            public:
+                __attribute__((always_inline)) ScopeGuard(std::function<void()> f) : f(std::move(f)) { }
+                __attribute__((always_inline)) ~ScopeGuard() { if (f) { f(); } }
+                void dismiss() { f = nullptr; }
+        };
 
         /**
          * @brief libnx hid:sys shim that gives or takes away frocus to or from the process with the given aruid
@@ -451,7 +476,7 @@ namespace tsl {
             void drawBitmap(s32 x, s32 y, s32 w, s32 h, const u8 *bmp) {
                 for (s32 y1 = 0; y1 < h; y1++) {
                     for (s32 x1 = 0; x1 < w; x1++) {
-                        const Color color = { static_cast<u8>(bmp[1] >> 4), static_cast<u8>(bmp[2] >> 4), static_cast<u8>(bmp[3] >> 4), static_cast<u8>(bmp[0] >> 4) };
+                        const Color color = { static_cast<u8>(bmp[0] >> 4), static_cast<u8>(bmp[1] >> 4), static_cast<u8>(bmp[2] >> 4), static_cast<u8>(bmp[3] >> 4) };
                         setPixelBlendSrc(x + x1, y + y1, a(color));
                         bmp += 4;
                     }
@@ -1457,7 +1482,9 @@ namespace tsl {
                     this->m_renderFunc(renderer, this->getX(), this->getY(), this->getWidth(), this->getHeight());
                 }
 
-                virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {}
+                virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                    this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
+                }
 
             private:
                 std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> m_renderFunc;
@@ -1983,18 +2010,29 @@ namespace tsl {
          * @param[out] launchCombo Overlay launch button combo
          */
         static void parseOverlaySettings(u64 &launchCombo) {
-            FILE *configFile = fopen("sdmc:/config/tesla/config.ini", "r");
+            /* Open Sd card filesystem. */
+            FsFileSystem fsSdmc;
+            if(R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
+                return;
+            hlp::ScopeGuard fsGuard([&] { fsFsClose(&fsSdmc); });
 
-            if (configFile == nullptr)
+            /* Open config file. */
+            FsFile fileConfig;
+            if (R_FAILED(fsFsOpenFile(&fsSdmc, "/config/tesla/config.ini", FsOpenMode_Read, &fileConfig)))
+                return;
+            hlp::ScopeGuard fileGuard([&] { fsFileClose(&fileConfig); });
+
+            /* Get config file size. */
+            s64 configFileSize;
+            if (R_FAILED(fsFileGetSize(&fileConfig, &configFileSize)))
                 return;
 
-            fseek(configFile, 0, SEEK_END);
-            size_t configFileSize = ftell(configFile);
-            rewind(configFile);
-
+            /* Read and parse config file. */
             std::string configFileData(configFileSize, '\0');
-            fread(&configFileData[0], sizeof(char), configFileSize, configFile);
-            fclose(configFile);
+            u64 readSize;
+            Result rc = fsFileRead(&fileConfig, 0, configFileData.data(), configFileSize, FsReadOption_None, &readSize);
+            if (R_FAILED(rc) || readSize != static_cast<u64>(configFileSize))
+                return;
 
             hlp::ini::IniData parsedConfig = hlp::ini::parseIni(configFileData);
 
@@ -2297,7 +2335,6 @@ extern "C" {
     void __appInit(void) {
         tsl::hlp::doWithSmSession([]{
             ASSERT_FATAL(fsInitialize());
-            ASSERT_FATAL(fsdevMountSdmc());
             ASSERT_FATAL(hidInitialize());      // Controller inputs and Touch
             ASSERT_FATAL(plInitialize());       // Font data
             ASSERT_FATAL(pmdmntInitialize());   // PID querying
