@@ -1415,12 +1415,18 @@ namespace tsl {
                 if (it == this->m_items.end() || direction == FocusDirection::None)
                     return this->m_items[0].element;
 
+                u16 oldFocusIdx = std::distance(this->m_items.begin(), it);
+
+                // number of spaces to have between top/bottom item and focused item while scrolling
+                // default 1, cannot exceed half of the number of entries shown
+                const int lead = std::min(1, (this->m_entriesShown - 1) / 2);
+
                 if (direction == FocusDirection::Up) {
-                    if (it == this->m_items.begin())
+                    if (oldFocusIdx == 0)
                         return this->m_items[0].element;
                     else {
-                        // old focus on the second item, and has offset
-                        if (oldFocus == (this->m_items.begin() + this->m_offset + 1)->element) {
+                        // old focus on the leading item, and has items offscreen above
+                        if (oldFocusIdx == this->m_offset + lead) {
                             if (this->m_offset > 0) {
                                 this->m_offset--;
                                 this->invalidate();
@@ -1429,13 +1435,12 @@ namespace tsl {
                         return (it - 1)->element;
                     }
                 } else if (direction == FocusDirection::Down) {
-                    if (it == (this->m_items.end() - 1)) {
+                    if (oldFocusIdx == this->m_items.size() - 1)
                         return this->m_items[this->m_items.size() - 1].element;
-                    }
                     else {
-                        // old focus on second to last item, and has more items hidden
-                        if (oldFocus == (this->m_items.begin() + this->m_offset + this->m_entriesShown - 2)->element) {
-                            if (this->m_items.size() > this->m_offset + this->m_entriesShown) {
+                        // old focus on the leading item, and has more items offscreen below
+                        if (oldFocusIdx == this->m_offset + (this->m_entriesShown - 1) - lead) {
+                            if (this->m_offset + this->m_entriesShown < this->m_items.size()) {
                                 this->m_offset++;
                                 this->invalidate();
                             }
