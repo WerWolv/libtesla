@@ -29,6 +29,7 @@
 #include <cstring>
 #include <cwctype>
 #include <string>
+#include <sstream>
 #include <functional>
 #include <type_traits>
 #include <mutex>
@@ -83,6 +84,7 @@ namespace tsl {
         extern u16 LayerPosY;                   ///< Y position of the Tesla layer
         extern u16 FramebufferWidth;            ///< Width of the framebuffer
         extern u16 FramebufferHeight;           ///< Height of the framebuffer
+        extern u64 launchCombo;                 ///< Overlay activation key combo
 
     }
 
@@ -123,6 +125,30 @@ namespace tsl {
         [[maybe_unused]] static constexpr LaunchFlags operator|(LaunchFlags lhs, LaunchFlags rhs) {
             return static_cast<LaunchFlags>(u8(lhs) | u8(rhs));
         }
+
+        /**
+         * @brief Combo key mapping
+         */
+        struct KeyInfo {
+            u64 key;
+            const char* name;
+            const char* glyph;
+        };
+
+        /**
+         * @brief Combo key mappings
+         * 
+         * Ordered as they should be displayed
+         */
+        static const std::list<KeyInfo> KEYS_INFO = {
+            { KEY_L, "L", "\uE0A4" }, { KEY_R, "R", "\uE0A5" },
+            { KEY_ZL, "ZL", "\uE0A6" }, { KEY_ZR, "ZR", "\uE0A7" },
+            { KEY_SL, "SL", "\uE0A8" }, { KEY_SR, "SR", "\uE0A9" },
+            { KEY_DLEFT, "DLEFT", "\uE07B" }, { KEY_DUP, "DUP", "\uE079" }, { KEY_DRIGHT, "DRIGHT", "\uE07C" }, { KEY_DDOWN, "DDOWN", "\uE07A" },
+            { KEY_A, "A", "\uE0A0" }, { KEY_B, "B", "\uE0A1" }, { KEY_X, "X", "\uE0A2" }, { KEY_Y, "Y", "\uE0A3" },
+            { KEY_LSTICK, "LS", "\uE08A" }, { KEY_RSTICK, "RS", "\uE08B" },
+            { KEY_MINUS, "MINUS", "\uE0B6" }, { KEY_PLUS, "PLUS", "\uE0B5" }
+        };
 
     }
 
@@ -231,6 +257,11 @@ namespace tsl {
             using IniData = std::map<std::string, std::map<std::string, std::string>>;
 
             /**
+             * @brief Tesla config file
+             */
+            static const char* CONFIG_FILE = "/config/tesla/config.ini";
+
+            /**
              * @brief Parses a ini string
              * 
              * @param str String to parse
@@ -257,6 +288,97 @@ namespace tsl {
                 return iniData;
             }
 
+            /**
+             * @brief Unparses ini data into a string
+             * 
+             * @param iniData Ini data
+             * @return Ini string
+             */
+            static std::string unparseIni(IniData const &iniData) {
+                std::stringstream ss;
+                bool addSectionGap = false;
+                for (auto &section : iniData) {
+                    if (addSectionGap)
+                        ss << "\n";
+                    ss << "[" << section.first << "]\n";
+                    for (auto &keyValue : section.second) {
+                        ss << keyValue.first << "=" << keyValue.second << "\n";
+                    }
+                }
+                return ss.str();
+            }
+
+            /**
+             * @brief Read Tesla settings file
+             * 
+             * @return Settings data
+             */
+            static IniData readOverlaySettings() {
+                /* Open Sd card filesystem. */
+                FsFileSystem fsSdmc;
+                if(R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
+                    return {};
+                hlp::ScopeGuard fsGuard([&] { fsFsClose(&fsSdmc); });
+
+                /* Open config file. */
+                FsFile fileConfig;
+                if (R_FAILED(fsFsOpenFile(&fsSdmc, CONFIG_FILE, FsOpenMode_Read, &fileConfig)))
+                    return {};
+                hlp::ScopeGuard fileGuard([&] { fsFileClose(&fileConfig); });
+
+                /* Get config file size. */
+                s64 configFileSize;
+                if (R_FAILED(fsFileGetSize(&fileConfig, &configFileSize)))
+                    return {};
+
+                /* Read and parse config file. */
+                std::string configFileData(configFileSize, '\0');
+                u64 readSize;
+                Result rc = fsFileRead(&fileConfig, 0, configFileData.data(), configFileSize, FsReadOption_None, &readSize);
+                if (R_FAILED(rc) || readSize != static_cast<u64>(configFileSize))
+                    return {};
+
+                return parseIni(configFileData);
+            }
+
+            /**
+             * @brief Replace Tesla settings file with new data
+             * 
+             * @param iniData new data
+             */
+            static void writeOverlaySettings(IniData const &iniData) {
+                /* Open Sd card filesystem. */
+                FsFileSystem fsSdmc;
+                if(R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
+                    return;
+                hlp::ScopeGuard fsGuard([&] { fsFsClose(&fsSdmc); });
+
+                /* Open config file. */
+                FsFile fileConfig;
+                if (R_FAILED(fsFsOpenFile(&fsSdmc, CONFIG_FILE, FsOpenMode_Write, &fileConfig)))
+                    return;
+                hlp::ScopeGuard fileGuard([&] { fsFileClose(&fileConfig); });
+
+                std::string iniString = unparseIni(iniData);
+
+                fsFileWrite(&fileConfig, 0, iniString.c_str(), iniString.length(), FsWriteOption_Flush);
+            }
+
+            /**
+             * @brief Merge and save changes into Tesla settings file
+             * 
+             * @param changes setting values to add or update
+             */
+            static void updateOverlaySettings(IniData const &changes) {
+                hlp::ini::IniData iniData = hlp::ini::readOverlaySettings();
+                for (auto &section : changes) {
+                    for (auto &keyValue : section.second) {
+                        iniData[section.first][keyValue.first] = keyValue.second;
+                    }
+                }
+                writeOverlaySettings(iniData);
+            }
+
         }
 
         /**
@@ -266,43 +388,43 @@ namespace tsl {
          * @return Key code
          */
         static u64 stringToKeyCode(std::string &value) {
-            if (strcasecmp(value.c_str(), "A")           == 0)
-                return KEY_A;
-            else if (strcasecmp(value.c_str(), "B")      == 0)
-                return KEY_B;
-            else if (strcasecmp(value.c_str(), "X")      == 0)
-                return KEY_X;
-            else if (strcasecmp(value.c_str(), "Y")      == 0)
-                return KEY_Y;
-            else if (strcasecmp(value.c_str(), "LS")     == 0)
-                return KEY_LSTICK;
-            else if (strcasecmp(value.c_str(), "RS")     == 0)
-                return KEY_RSTICK;
-            else if (strcasecmp(value.c_str(), "L")      == 0)
-                return KEY_L;
-            else if (strcasecmp(value.c_str(), "R")      == 0)
-                return KEY_R;
-            else if (strcasecmp(value.c_str(), "ZL")     == 0)
-                return KEY_ZL;
-            else if (strcasecmp(value.c_str(), "ZR")     == 0)
-                return KEY_ZR;
-            else if (strcasecmp(value.c_str(), "PLUS")   == 0)
-                return KEY_PLUS;
-            else if (strcasecmp(value.c_str(), "MINUS")  == 0)
-                return KEY_MINUS;
-            else if (strcasecmp(value.c_str(), "DLEFT")  == 0)
-                return KEY_DLEFT;
-            else if (strcasecmp(value.c_str(), "DUP")    == 0)
-                return KEY_DUP;
-            else if (strcasecmp(value.c_str(), "DRIGHT") == 0)
-                return KEY_DRIGHT;
-            else if (strcasecmp(value.c_str(), "DDOWN")  == 0)
-                return KEY_DDOWN;
-            else if (strcasecmp(value.c_str(), "SL")     == 0)
-                return KEY_SL;
-            else if (strcasecmp(value.c_str(), "SR")     == 0)
-                return KEY_SR;
-            else return 0;
+            for (auto &keyInfo : impl::KEYS_INFO) {
+                if (strcasecmp(value.c_str(), keyInfo.name) == 0)
+                    return keyInfo.key;
+            }
+            return 0;
+        }
+
+        /**
+         * @brief Decodes a combo string into key codes
+         * 
+         * @param value Combo string
+         * @return Key codes
+         */
+        static u64 comboStringToKeys(std::string &value) {
+            u64 keyCombo = 0x00;
+            for (std::string key : hlp::split(value, '+')) {
+                keyCombo |= hlp::stringToKeyCode(key);
+            }
+            return keyCombo;
+        }
+
+        /**
+         * @brief Encodes key codes into a combo string
+         * 
+         * @param keys Key codes
+         * @return Combo string
+         */
+        static std::string keysToComboString(u64 keys) {
+            std::string str;
+            for (auto &keyInfo : impl::KEYS_INFO) {
+                if (keys & keyInfo.key) {
+                    if (!str.empty())
+                        str.append("+");
+                    str.append(keyInfo.name);
+                }
+            }
+            return str;
         }
 
     }
@@ -1992,7 +2114,6 @@ namespace tsl {
 
             Event comboEvent = { 0 }, homeButtonPressEvent = { 0 }, powerButtonPressEvent = { 0 };
 
-            u64 launchCombo = KEY_L | KEY_DDOWN | KEY_RSTICK;
             bool overlayOpen = false;
 
             std::mutex dataMutex;
@@ -2005,40 +2126,30 @@ namespace tsl {
 
 
         /**
-         * @brief Parses the Tesla settings
+         * @brief Extract values from Tesla settings file
          * 
-         * @param[out] launchCombo Overlay launch button combo
+         * @param[out] keyCombo Overlay launch button combo
          */
-        static void parseOverlaySettings(u64 &launchCombo) {
-            /* Open Sd card filesystem. */
-            FsFileSystem fsSdmc;
-            if(R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
-                return;
-            hlp::ScopeGuard fsGuard([&] { fsFsClose(&fsSdmc); });
+        static void parseOverlaySettings(u64 &keyCombo) {
+            hlp::ini::IniData parsedConfig = hlp::ini::readOverlaySettings();
 
-            /* Open config file. */
-            FsFile fileConfig;
-            if (R_FAILED(fsFsOpenFile(&fsSdmc, "/config/tesla/config.ini", FsOpenMode_Read, &fileConfig)))
-                return;
-            hlp::ScopeGuard fileGuard([&] { fsFileClose(&fileConfig); });
+            u64 decodedKeys = hlp::comboStringToKeys(parsedConfig["tesla"]["key_combo"]);
+            if (decodedKeys)
+                keyCombo = decodedKeys;
+        }
 
-            /* Get config file size. */
-            s64 configFileSize;
-            if (R_FAILED(fsFileGetSize(&fileConfig, &configFileSize)))
-                return;
-
-            /* Read and parse config file. */
-            std::string configFileData(configFileSize, '\0');
-            u64 readSize;
-            Result rc = fsFileRead(&fileConfig, 0, configFileData.data(), configFileSize, FsReadOption_None, &readSize);
-            if (R_FAILED(rc) || readSize != static_cast<u64>(configFileSize))
-                return;
-
-            hlp::ini::IniData parsedConfig = hlp::ini::parseIni(configFileData);
-
-            launchCombo = 0x00;
-            for (std::string key : hlp::split(parsedConfig["tesla"]["key_combo"], '+'))
-                launchCombo |= hlp::stringToKeyCode(key);
+        /**
+         * @brief Update and save launch combo keys
+         * 
+         * @param keys the new combo keys
+         */
+        [[maybe_unused]] static void updateCombo(u64 keys) {
+            tsl::cfg::launchCombo = keys;
+            hlp::ini::updateOverlaySettings({
+                { "tesla", {
+                    { "key_combo", tsl::hlp::keysToComboString(keys) }
+                }}
+            });
         }
 
         /**
@@ -2052,7 +2163,7 @@ namespace tsl {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
             
             // Parse Tesla settings
-            impl::parseOverlaySettings(shData->launchCombo);
+            impl::parseOverlaySettings(tsl::cfg::launchCombo);
 
             // Drop all inputs from the previous overlay
             hidScanInput();
@@ -2092,7 +2203,7 @@ namespace tsl {
                     hidJoystickRead(&shData->joyStickPosLeft, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_LEFT);
                     hidJoystickRead(&shData->joyStickPosRight, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_RIGHT);
 
-                    if (((shData->keysHeld & shData->launchCombo) == shData->launchCombo) && shData->keysDown & shData->launchCombo) {
+                    if (((shData->keysHeld & tsl::cfg::launchCombo) == tsl::cfg::launchCombo) && shData->keysDown & tsl::cfg::launchCombo) {
                         if (shData->overlayOpen) {
                             tsl::Overlay::get()->hide();
                             shData->overlayOpen = false;
@@ -2319,6 +2430,7 @@ namespace tsl::cfg {
     u16 LayerPosY   = 0;
     u16 FramebufferWidth  = 0;
     u16 FramebufferHeight = 0;
+    u64 launchCombo = KEY_L | KEY_DDOWN | KEY_RSTICK;
 
 }
 
