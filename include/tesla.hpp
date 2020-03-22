@@ -1407,6 +1407,7 @@ namespace tsl {
 
             virtual void setFocused(bool state) final {
                 this->m_scroll = false;
+                this->m_scrollOffset = 0;
                 this->m_counter = 0;
                 this->m_focused = state;
             }
