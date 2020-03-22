@@ -249,6 +249,21 @@ namespace tsl {
             return out;
         }
 
+        /**
+         * @brief Limit a strings length and end it with "…"
+         * 
+         * @param string String to truncate
+         * @param maxLength Maximum length of string
+         */
+        static std::string limitStringLength(std::string string, size_t maxLength) {
+            if (string.length() <= maxLength)
+                return string;
+
+            std::strcpy(&string[maxLength - 2], "…");
+
+            return string;
+        }
+
         namespace ini {
 
             /**
@@ -633,7 +648,7 @@ namespace tsl {
              * @param color Text color. Use transparent color to skip drawing and only get the string's dimensions
              * @return Dimensions of drawn string
              */
-            std::pair<u32, u32> drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color, size_t maxWidth = 0) {
+            std::pair<u32, u32> drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color, size_t maxWidth = 0, size_t* written = nullptr) {
                 const size_t stringLength = strlen(string);
 
                 u32 maxX = x;
@@ -646,6 +661,8 @@ namespace tsl {
                 do {
                     if (maxWidth > 0 && maxWidth < (currX - x))
                         break;
+
+                    if (written) *written += 1;
 
                     u32 currCharacter;
                     ssize_t codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(string + i));
@@ -1328,7 +1345,7 @@ namespace tsl {
              * 
              * @param text Initial description text
              */
-            ListItem(const std::string& text) : Element(), m_text(text), m_value(""), m_scrollText(""), m_scroll(), m_trunctuated(), m_faint(), m_maxScroll(), m_scrollOffset(), m_maxWidth(), m_counter() {
+            ListItem(const std::string& text) : Element(), m_text(text), m_value(""), m_scrollText(""), m_ellipsisText(""), m_scroll(), m_trunctuated(), m_faint(), m_maxScroll(), m_scrollOffset(), m_maxWidth(), m_counter() {
             }
             virtual ~ListItem() {}
 
@@ -1341,11 +1358,13 @@ namespace tsl {
                         this->m_maxWidth = this->getWidth() - 40;
                     }
 
-                    auto [textWidth, textHeight] = renderer->drawString(this->m_text.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent);
-                    this->m_trunctuated = this->m_maxWidth < textWidth;
+                    size_t written = 0;
+                    renderer->drawString(this->m_text.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent, this->m_maxWidth, &written);
+                    this->m_trunctuated = written < this->m_text.length();
                     if (this->m_trunctuated) {
                         this->m_maxScroll = this->m_text.length() + 8;
                         this->m_scrollText = this->m_text + "        " + this->m_text;
+                        this->m_ellipsisText = hlp::limitStringLength(this->m_text, written);
                     }
                 }
 
@@ -1353,24 +1372,28 @@ namespace tsl {
                 renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
 
                 const char *text = m_text.c_str();
-                if (this->m_focused && this->m_trunctuated) {
-                    if (this->m_scroll) {
-                        if ((this->m_counter % 20) == 0) {
-                            this->m_scrollOffset++;
-                            if (this->m_scrollOffset >= this->m_maxScroll) {
-                                this->m_scrollOffset = 0;
-                                this->m_scroll = false;
+                if (this->m_trunctuated) {
+                    if (this->m_focused) {
+                        if (this->m_scroll) {
+                            if ((this->m_counter % 20) == 0) {
+                                this->m_scrollOffset++;
+                                if (this->m_scrollOffset >= this->m_maxScroll) {
+                                    this->m_scrollOffset = 0;
+                                    this->m_scroll = false;
+                                    this->m_counter = 0;
+                                }
+                            }
+                            text = this->m_scrollText.c_str() + this->m_scrollOffset;
+                        } else {
+                            if (this->m_counter > 60) {
+                                this->m_scroll = true;
                                 this->m_counter = 0;
                             }
                         }
-                        text = this->m_scrollText.c_str() + this->m_scrollOffset;
+                        this->m_counter++;
                     } else {
-                        if (this->m_counter > 60) {
-                            this->m_scroll = true;
-                            this->m_counter = 0;
-                        }
+                        text = m_ellipsisText.c_str();
                     }
-                    this->m_counter++;
                 }
 
                 renderer->drawString(text, false, this->getX() + 20, this->getY() + 45, 23, a({ 0xF, 0xF, 0xF, 0xF }), this->m_maxWidth);
@@ -1418,6 +1441,7 @@ namespace tsl {
             std::string m_text;
             std::string m_value;
             std::string m_scrollText;
+            std::string m_ellipsisText;
             bool m_scroll;
             bool m_trunctuated;
             bool m_faint;
