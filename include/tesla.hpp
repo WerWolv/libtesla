@@ -1328,7 +1328,7 @@ namespace tsl {
              * 
              * @param text Initial description text
              */
-            ListItem(const std::string& text) : Element(), m_text(text), m_value(""), m_cur(m_text.c_str()), m_scroll(), m_trunctuated(), m_faint(), m_maxWidth(), m_counter() {
+            ListItem(const std::string& text) : Element(), m_text(text), m_value(""), m_scrollText(""), m_scroll(), m_trunctuated(), m_faint(), m_maxScroll(), m_scrollOffset(), m_maxWidth(), m_counter() {
             }
             virtual ~ListItem() {}
 
@@ -1343,23 +1343,29 @@ namespace tsl {
 
                     auto [textWidth, textHeight] = renderer->drawString(this->m_text.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent);
                     this->m_trunctuated = this->m_maxWidth < textWidth;
+                    if (this->m_trunctuated) {
+                        this->m_maxScroll = this->m_text.length() + 8;
+                        this->m_scrollText = this->m_text + "        " + this->m_text;
+                    }
                 }
 
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
                 renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
 
+                const char *text = m_text.c_str();
                 if (this->m_focused && this->m_trunctuated) {
                     if (this->m_scroll) {
-                        if ((m_counter % 20) == 0) {
-                            m_cur++;
-                            if (m_cur[0] == '\0') {
-                                m_cur = m_text.c_str();
-                                m_scroll = false;
-                                m_counter = 0;
+                        if ((this->m_counter % 20) == 0) {
+                            this->m_scrollOffset++;
+                            if (this->m_scrollOffset >= this->m_maxScroll) {
+                                this->m_scrollOffset = 0;
+                                this->m_scroll = false;
+                                this->m_counter = 0;
                             }
                         }
+                        text = this->m_scrollText.c_str() + this->m_scrollOffset;
                     } else {
-                        if (m_counter > 60) {
+                        if (this->m_counter > 60) {
                             this->m_scroll = true;
                             this->m_counter = 0;
                         }
@@ -1367,7 +1373,7 @@ namespace tsl {
                     this->m_counter++;
                 }
 
-                renderer->drawString(this->m_cur, false, this->getX() + 20, this->getY() + 45, 23, a({ 0xF, 0xF, 0xF, 0xF }), this->m_maxWidth);
+                renderer->drawString(text, false, this->getX() + 20, this->getY() + 45, 23, a({ 0xF, 0xF, 0xF, 0xF }), this->m_maxWidth);
 
                 renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 45, 20, this->m_faint ? a({ 0x6, 0x6, 0x6, 0xF }) : a({ 0x5, 0xC, 0xA, 0xF }));
             }
@@ -1377,7 +1383,6 @@ namespace tsl {
             }
 
             virtual void setFocused(bool state) final {
-                this->m_cur = this->m_text.c_str();
                 this->m_scroll = false;
                 this->m_counter = 0;
                 this->m_focused = state;
@@ -1394,7 +1399,6 @@ namespace tsl {
              */
             virtual inline void setText(const std::string& text) final {
                 this->m_text = text;
-                this->m_cur = this->m_text.c_str();
                 this->m_maxWidth = 0;
             }
 
@@ -1413,11 +1417,13 @@ namespace tsl {
         protected:
             std::string m_text;
             std::string m_value;
-            const char *m_cur;
+            std::string m_scrollText;
             bool m_scroll;
             bool m_trunctuated;
             bool m_faint;
 
+            u16 m_maxScroll;
+            u16 m_scrollOffset;
             u32 m_maxWidth;
             u16 m_counter;
         };
