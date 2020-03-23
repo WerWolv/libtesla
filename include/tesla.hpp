@@ -2119,25 +2119,6 @@ namespace tsl {
             this->m_disableNextAnimation = true;
         }
 
-                /**
-         * @brief Creates a new Gui and changes to it
-         * 
-         * @tparam G Gui to create 
-         * @tparam Args Arguments to pass to the Gui
-         * @param args Arguments to pass to the Gui
-         * @return Reference to the newly created Gui
-         */
-        template<typename G, typename ...Args>
-        std::unique_ptr<tsl::Gui>& changeTo(Args&&... args) {
-            auto newGui = std::make_unique<G>(std::forward<Args>(args)...);
-            newGui->m_topElement = newGui->createUI();
-            newGui->requestFocus(newGui->m_topElement, FocusDirection::None);
-
-            this->m_guiStack.push(std::move(newGui));
-
-            return this->m_guiStack.top();
-        }
-
         /**
          * @brief Changes to a different Gui
          * 
@@ -2151,6 +2132,19 @@ namespace tsl {
             this->m_guiStack.push(std::move(gui));
 
             return this->m_guiStack.top();
+        }
+
+        /**
+         * @brief Creates a new Gui and changes to it
+         * 
+         * @tparam G Gui to create
+         * @tparam Args Arguments to pass to the Gui
+         * @param args Arguments to pass to the Gui
+         * @return Reference to the newly created Gui
+         */
+        template<typename G, typename ...Args>
+        std::unique_ptr<tsl::Gui>& changeTo(Args&&... args) {
+            return this->changeTo(std::make_unique<G>(std::forward<Args>(args)...));
         }
 
         /**
