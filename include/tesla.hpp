@@ -331,7 +331,7 @@ namespace tsl {
             static IniData readOverlaySettings() {
                 /* Open Sd card filesystem. */
                 FsFileSystem fsSdmc;
-                if(R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
+                if (R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
                     return {};
                 hlp::ScopeGuard fsGuard([&] { fsFsClose(&fsSdmc); });
 
@@ -364,7 +364,7 @@ namespace tsl {
             static void writeOverlaySettings(IniData const &iniData) {
                 /* Open Sd card filesystem. */
                 FsFileSystem fsSdmc;
-                if(R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
+                if (R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
                     return;
                 hlp::ScopeGuard fsGuard([&] { fsFsClose(&fsSdmc); });
 
@@ -662,7 +662,8 @@ namespace tsl {
                     if (maxWidth > 0 && maxWidth < (currX - x))
                         break;
 
-                    if (written) *written += 1;
+                    if (written != nullptr)
+                        *written += 1;
 
                     u32 currCharacter;
                     ssize_t codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(string + i));
@@ -897,25 +898,21 @@ namespace tsl {
              * @return Result
              */
             Result initFonts() {
-                Result res;
-
                 static PlFontData stdFontData, extFontData;
 
                 // Nintendo's default font
-                if(R_FAILED(res = plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard)))
-                    return res;
+                R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard));
 
                 u8 *fontBuffer = reinterpret_cast<u8*>(stdFontData.address);
                 stbtt_InitFont(&this->m_stdFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
                 
                 // Nintendo's extended font containing a bunch of icons
-                if(R_FAILED(res = plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt)))
-                    return res;
+                R_TRY(plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt));
 
                 fontBuffer = reinterpret_cast<u8*>(extFontData.address);
                 stbtt_InitFont(&this->m_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
 
-                return res;
+                return 0;
             }
             
             /**
@@ -1345,7 +1342,9 @@ namespace tsl {
              * 
              * @param text Initial description text
              */
-            ListItem(const std::string& text) : Element(), m_text(text), m_value(""), m_scrollText(""), m_ellipsisText(""), m_scroll(), m_trunctuated(), m_faint(), m_maxScroll(), m_scrollOffset(), m_maxWidth(), m_counter() {
+            ListItem(const std::string& text)
+                : Element(), m_text(text), m_value(""), m_scrollText(""), m_ellipsisText(""), m_scroll(),
+                m_trunctuated(), m_faint(), m_maxScroll(), m_scrollOffset(), m_maxWidth(), m_counter() {
             }
             virtual ~ListItem() {}
 
@@ -1405,7 +1404,7 @@ namespace tsl {
                 
             }
 
-            virtual void setFocused(bool state) final {
+            virtual void setFocused(bool state) override {
                 this->m_scroll = false;
                 this->m_scrollOffset = 0;
                 this->m_counter = 0;
