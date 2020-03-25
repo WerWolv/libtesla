@@ -89,7 +89,9 @@ namespace tsl {
     }
 
     namespace style {
-        constexpr u32 ListItemDefaultHeight = 72;   ///< Height of a standard ListItem
+        constexpr u32 ListItemDefaultHeight = 72;       ///< Height of a standard ListItem
+        constexpr u8 ListItemHighlightSaturation = 0x9; ///< Maximum saturation of Listitem highlights
+        constexpr u8 ListItemHighlightLength = 22;      ///< Maximum length of Listitem highlights
 
         namespace color {
             constexpr u16 ColorTransparent = 0x0000;    ///< Transparent color
@@ -154,7 +156,7 @@ namespace tsl {
 
     [[maybe_unused]] static void goBack();
 
-    [[maybe_unused]] static void setNextOverlay(std::string ovlPath, std::string args = "");
+    [[maybe_unused]] static void setNextOverlay(const std::string& ovlPath, std::string args = "");
 
     template<typename TOverlay, impl::LaunchFlags launchFlags = impl::LaunchFlags::CloseOnExit>   
     int loop(int argc, char** argv);
@@ -249,6 +251,21 @@ namespace tsl {
             return out;
         }
 
+        /**
+         * @brief Limit a strings length and end it with "…"
+         * 
+         * @param string String to truncate
+         * @param maxLength Maximum length of string
+         */
+        static std::string limitStringLength(std::string string, size_t maxLength) {
+            if (string.length() <= maxLength)
+                return string;
+
+            std::strcpy(&string[maxLength - 2], "…");
+
+            return string;
+        }
+
         namespace ini {
 
             /**
@@ -267,7 +284,7 @@ namespace tsl {
              * @param str String to parse
              * @return Parsed data
              */
-            static IniData parseIni(std::string &str) {
+            static IniData parseIni(const std::string &str) {
                 IniData iniData;
                 
                 auto lines = split(str, '\n');
@@ -316,7 +333,7 @@ namespace tsl {
             static IniData readOverlaySettings() {
                 /* Open Sd card filesystem. */
                 FsFileSystem fsSdmc;
-                if(R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
+                if (R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
                     return {};
                 hlp::ScopeGuard fsGuard([&] { fsFsClose(&fsSdmc); });
 
@@ -349,7 +366,7 @@ namespace tsl {
             static void writeOverlaySettings(IniData const &iniData) {
                 /* Open Sd card filesystem. */
                 FsFileSystem fsSdmc;
-                if(R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
+                if (R_FAILED(fsOpenSdCardFileSystem(&fsSdmc)))
                     return;
                 hlp::ScopeGuard fsGuard([&] { fsFsClose(&fsSdmc); });
 
@@ -387,7 +404,7 @@ namespace tsl {
          * @param value Key string
          * @return Key code
          */
-        static u64 stringToKeyCode(std::string &value) {
+        static u64 stringToKeyCode(const std::string &value) {
             for (auto &keyInfo : impl::KEYS_INFO) {
                 if (strcasecmp(value.c_str(), keyInfo.name) == 0)
                     return keyInfo.key;
@@ -401,7 +418,7 @@ namespace tsl {
          * @param value Combo string
          * @return Key codes
          */
-        static u64 comboStringToKeys(std::string &value) {
+        static u64 comboStringToKeys(const std::string &value) {
             u64 keyCombo = 0x00;
             for (std::string key : hlp::split(value, '+')) {
                 keyCombo |= hlp::stringToKeyCode(key);
@@ -633,7 +650,7 @@ namespace tsl {
              * @param color Text color. Use transparent color to skip drawing and only get the string's dimensions
              * @return Dimensions of drawn string
              */
-            std::pair<u32, u32> drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color) {
+            std::pair<u32, u32> drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color, size_t maxWidth = 0, size_t* written = nullptr) {
                 const size_t stringLength = strlen(string);
 
                 u32 maxX = x;
@@ -644,6 +661,12 @@ namespace tsl {
                 u32 i = 0;
 
                 do {
+                    if (maxWidth > 0 && maxWidth < (currX - x))
+                        break;
+
+                    if (written != nullptr)
+                        *written += 1;
+
                     u32 currCharacter;
                     ssize_t codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(string + i));
 
@@ -682,7 +705,7 @@ namespace tsl {
                         this->drawGlyph(currCharacter, currX + bounds[0], currY + bounds[1], color, currFont, currFontSize);
 
                     currX += xAdvance * currFontSize;
-                    
+
                 } while (i < stringLength);
 
                 maxX = std::max(currX, maxX);
@@ -877,25 +900,21 @@ namespace tsl {
              * @return Result
              */
             Result initFonts() {
-                Result res;
-
                 static PlFontData stdFontData, extFontData;
 
                 // Nintendo's default font
-                if(R_FAILED(res = plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard)))
-                    return res;
+                R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard));
 
                 u8 *fontBuffer = reinterpret_cast<u8*>(stdFontData.address);
                 stbtt_InitFont(&this->m_stdFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
                 
                 // Nintendo's extended font containing a bunch of icons
-                if(R_FAILED(res = plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt)))
-                    return res;
+                R_TRY(plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt));
 
                 fontBuffer = reinterpret_cast<u8*>(extFontData.address);
                 stbtt_InitFont(&this->m_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
 
-                return res;
+                return 0;
             }
             
             /**
@@ -1187,13 +1206,13 @@ namespace tsl {
 
         protected:
             constexpr static inline auto a = &gfx::Renderer::a;
+            bool m_focused = false;
 
         private:
             friend class Gui;
 
             u16 m_x = 0, m_y = 0, m_width = 0, m_height = 0;
             Element *m_parent = nullptr;
-            bool m_focused = false;
 
             std::function<bool(u64 keys)> m_clickListener = [](u64) { return false; };
 
@@ -1232,7 +1251,7 @@ namespace tsl {
              * @param title Name of the Overlay drawn bolt at the top
              * @param subtitle Subtitle drawn bellow the title e.g version number
              */
-            OverlayFrame(std::string title, std::string subtitle) : Element(), m_title(title), m_subtitle(subtitle) {}
+            OverlayFrame(const std::string& title, const std::string& subtitle) : Element(), m_title(title), m_subtitle(subtitle) {}
             virtual ~OverlayFrame() {
                 if (this->m_contentElement != nullptr)
                     delete this->m_contentElement;
@@ -1325,25 +1344,85 @@ namespace tsl {
              * 
              * @param text Initial description text
              */
-            ListItem(std::string text) : Element(), m_text(text) {}
+            ListItem(const std::string& text)
+                : Element(), m_text(text) {
+            }
             virtual ~ListItem() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
-                if (this->m_valueWidth == 0) {
-                    auto [width, height] = renderer->drawString(this->m_value.c_str(), false, 0, 0, 20, tsl::style::color::ColorTransparent);
-                    this->m_valueWidth = width;
+                if (this->m_maxWidth == 0) {
+                    if (this->m_value.length() > 0) {
+                        auto [valueWidth, valueHeight] = renderer->drawString(this->m_value.c_str(), false, 0, 0, 20, tsl::style::color::ColorTransparent);
+                        this->m_maxWidth = this->getWidth() - valueWidth - 70;
+                    } else {
+                        this->m_maxWidth = this->getWidth() - 40;
+                    }
+
+                    size_t written = 0;
+                    renderer->drawString(this->m_text.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent, this->m_maxWidth, &written);
+                    this->m_trunctuated = written < this->m_text.length();
+                    if (this->m_trunctuated) {
+                        this->m_maxScroll = this->m_text.length() + 8;
+                        this->m_scrollText = this->m_text + "        " + this->m_text;
+                        this->m_ellipsisText = hlp::limitStringLength(this->m_text, written);
+                    }
+                }
+
+                if (this->m_selectFactor) {
+                    u8 saturation = tsl::style::ListItemHighlightSaturation * (float(this->m_selectFactor) / float(tsl::style::ListItemHighlightLength));
+                    renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a({0x0, saturation, saturation, 0xf}));
+                    --this->m_selectFactor;
                 }
 
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
                 renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
 
-                renderer->drawString(this->m_text.c_str(), false, this->getX() + 20, this->getY() + 45, 23, a({ 0xF, 0xF, 0xF, 0xF }));
+                const char *text = m_text.c_str();
+                if (this->m_trunctuated) {
+                    if (this->m_focused) {
+                        if (this->m_scroll) {
+                            if ((this->m_counter % 20) == 0) {
+                                this->m_scrollOffset++;
+                                if (this->m_scrollOffset >= this->m_maxScroll) {
+                                    this->m_scrollOffset = 0;
+                                    this->m_scroll = false;
+                                    this->m_counter = 0;
+                                }
+                            }
+                            text = this->m_scrollText.c_str() + this->m_scrollOffset;
+                        } else {
+                            if (this->m_counter > 60) {
+                                this->m_scroll = true;
+                                this->m_counter = 0;
+                            }
+                        }
+                        this->m_counter++;
+                    } else {
+                        text = this->m_ellipsisText.c_str();
+                    }
+                }
 
-                renderer->drawString(this->m_value.c_str(), false, this->getX() + this->getWidth() - this->m_valueWidth - 20, this->getY() + 45, 20, this->m_faint ? a({ 0x6, 0x6, 0x6, 0xF }) : a({ 0x5, 0xC, 0xA, 0xF }));
+                renderer->drawString(text, false, this->getX() + 20, this->getY() + 45, 23, a({ 0xF, 0xF, 0xF, 0xF }), this->m_maxWidth);
+
+                renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 45, 20, this->m_faint ? a({ 0x6, 0x6, 0x6, 0xF }) : a({ 0x5, 0xC, 0xA, 0xF }));
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
                 
+            }
+
+            virtual bool onClick(u64 keys) {
+                if (keys & KEY_A)
+                    m_selectFactor = tsl::style::ListItemHighlightLength;
+
+                return false;
+            }
+
+            virtual void setFocused(bool state) override {
+                this->m_scroll = false;
+                this->m_scrollOffset = 0;
+                this->m_counter = 0;
+                this->m_focused = state;
             }
 
             virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
@@ -1355,8 +1434,9 @@ namespace tsl {
              * 
              * @param text Text
              */
-            virtual inline void setText(std::string text) final { 
+            virtual inline void setText(const std::string& text) final {
                 this->m_text = text;
+                this->m_maxWidth = 0;
             }
 
             /**
@@ -1365,18 +1445,26 @@ namespace tsl {
              * @param value Text
              * @param faint Should the text be drawn in a glowing green or a faint gray
              */
-            virtual inline void setValue(std::string value, bool faint = false) { 
+            virtual inline void setValue(const std::string& value, bool faint = false) {
                 this->m_value = value;
                 this->m_faint = faint;
-                this->m_valueWidth = 0;
+                this->m_maxWidth = 0;
             }
 
         protected:
             std::string m_text;
             std::string m_value = "";
+            std::string m_scrollText = "";
+            std::string m_ellipsisText = "";
+            bool m_scroll = false;
+            bool m_trunctuated = false;
             bool m_faint = false;
 
-            u16 m_valueWidth = 0;
+            u16 m_maxScroll = 0;
+            u16 m_scrollOffset = 0;
+            u32 m_maxWidth = 0;
+            u16 m_counter = 0;
+            u8 m_selectFactor = 0;
         };
 
         /**
@@ -1393,7 +1481,7 @@ namespace tsl {
              * @param onValue Value drawn if the toggle is on
              * @param offValue Value drawn if the toggle is off
              */
-            ToggleListItem(std::string text, bool initialState, std::string onValue = "On", std::string offValue = "Off")
+            ToggleListItem(const std::string& text, bool initialState, const std::string& onValue = "On", const std::string& offValue = "Off")
                 : ListItem(text), m_state(initialState), m_onValue(onValue), m_offValue(offValue) {
                 
                 this->setState(this->m_state);
@@ -2045,25 +2133,6 @@ namespace tsl {
             this->m_disableNextAnimation = true;
         }
 
-                /**
-         * @brief Creates a new Gui and changes to it
-         * 
-         * @tparam G Gui to create 
-         * @tparam Args Arguments to pass to the Gui
-         * @param args Arguments to pass to the Gui
-         * @return Reference to the newly created Gui
-         */
-        template<typename G, typename ...Args>
-        std::unique_ptr<tsl::Gui>& changeTo(Args&&... args) {
-            auto newGui = std::make_unique<G>(std::forward<Args>(args)...);
-            newGui->m_topElement = newGui->createUI();
-            newGui->requestFocus(newGui->m_topElement, FocusDirection::None);
-
-            this->m_guiStack.push(std::move(newGui));
-
-            return this->m_guiStack.top();
-        }
-
         /**
          * @brief Changes to a different Gui
          * 
@@ -2077,6 +2146,19 @@ namespace tsl {
             this->m_guiStack.push(std::move(gui));
 
             return this->m_guiStack.top();
+        }
+
+        /**
+         * @brief Creates a new Gui and changes to it
+         * 
+         * @tparam G Gui to create
+         * @tparam Args Arguments to pass to the Gui
+         * @param args Arguments to pass to the Gui
+         * @return Reference to the newly created Gui
+         */
+        template<typename G, typename ...Args>
+        std::unique_ptr<tsl::Gui>& changeTo(Args&&... args) {
+            return this->changeTo(std::make_unique<G>(std::forward<Args>(args)...));
         }
 
         /**
@@ -2307,7 +2389,7 @@ namespace tsl {
         Overlay::get()->goBack();
     }
 
-    static void setNextOverlay(std::string ovlPath, std::string args) {
+    static void setNextOverlay(const std::string& ovlPath, std::string args) {
 
         args += " --skipCombo";
 
