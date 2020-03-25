@@ -89,7 +89,9 @@ namespace tsl {
     }
 
     namespace style {
-        constexpr u32 ListItemDefaultHeight = 72;   ///< Height of a standard ListItem
+        constexpr u32 ListItemDefaultHeight = 72;       ///< Height of a standard ListItem
+        constexpr u8 ListItemHighlightSaturation = 0x9; ///< Maximum saturation of Listitem highlights
+        constexpr u8 ListItemHighlightLength = 22;      ///< Maximum length of Listitem highlights
 
         namespace color {
             constexpr u16 ColorTransparent = 0x0000;    ///< Transparent color
@@ -1343,8 +1345,7 @@ namespace tsl {
              * @param text Initial description text
              */
             ListItem(const std::string& text)
-                : Element(), m_text(text), m_value(""), m_scrollText(""), m_ellipsisText(""), m_scroll(),
-                m_trunctuated(), m_faint(), m_maxScroll(), m_scrollOffset(), m_maxWidth(), m_counter() {
+                : Element(), m_text(text) {
             }
             virtual ~ListItem() {}
 
@@ -1365,6 +1366,12 @@ namespace tsl {
                         this->m_scrollText = this->m_text + "        " + this->m_text;
                         this->m_ellipsisText = hlp::limitStringLength(this->m_text, written);
                     }
+                }
+
+                if (this->m_selectFactor) {
+                    u8 saturation = tsl::style::ListItemHighlightSaturation * (float(this->m_selectFactor) / float(tsl::style::ListItemHighlightLength));
+                    renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a({0x0, saturation, saturation, 0xf}));
+                    --this->m_selectFactor;
                 }
 
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
@@ -1391,7 +1398,7 @@ namespace tsl {
                         }
                         this->m_counter++;
                     } else {
-                        text = m_ellipsisText.c_str();
+                        text = this->m_ellipsisText.c_str();
                     }
                 }
 
@@ -1402,6 +1409,13 @@ namespace tsl {
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
                 
+            }
+
+            virtual bool onClick(u64 keys) {
+                if (keys & KEY_A)
+                    m_selectFactor = tsl::style::ListItemHighlightLength;
+
+                return false;
             }
 
             virtual void setFocused(bool state) override {
@@ -1439,17 +1453,18 @@ namespace tsl {
 
         protected:
             std::string m_text;
-            std::string m_value;
-            std::string m_scrollText;
-            std::string m_ellipsisText;
-            bool m_scroll;
-            bool m_trunctuated;
-            bool m_faint;
+            std::string m_value = "";
+            std::string m_scrollText = "";
+            std::string m_ellipsisText = "";
+            bool m_scroll = false;
+            bool m_trunctuated = false;
+            bool m_faint = false;
 
-            u16 m_maxScroll;
-            u16 m_scrollOffset;
-            u32 m_maxWidth;
-            u16 m_counter;
+            u16 m_maxScroll = 0;
+            u16 m_scrollOffset = 0;
+            u32 m_maxWidth = 0;
+            u16 m_counter = 0;
+            u8 m_selectFactor = 0;
         };
 
         /**
