@@ -90,7 +90,7 @@ namespace tsl {
 
     namespace style {
         constexpr u32 ListItemDefaultHeight = 72;       ///< Height of a standard ListItem
-        constexpr u8 ListItemHighlightSaturation = 0x9; ///< Maximum saturation of Listitem highlights
+        constexpr u8 ListItemHighlightSaturation = 0x6; ///< Maximum saturation of Listitem highlights
         constexpr u8 ListItemHighlightLength = 22;      ///< Maximum length of Listitem highlights
 
         namespace color {
@@ -1079,6 +1079,26 @@ namespace tsl {
             }
 
             /**
+             * @brief Triggers the blue click animation to signal a element has been clicked on
+             * 
+             */
+            virtual void triggerClickAnimation() final {
+                this->m_clickAnimationProgress = tsl::style::ListItemHighlightLength;
+            }
+
+            /**
+             * @brief Draws the blue highlight animation when clicking on a button
+             * @note Override this if you have a element that e.g requires a non-rectangular animation or a different color
+             * 
+             * @param renderer Renderer
+             */
+            virtual void drawClickAnimation(gfx::Renderer *renderer) {
+                u8 saturation = tsl::style::ListItemHighlightSaturation * (float(this->m_clickAnimationProgress) / float(tsl::style::ListItemHighlightLength));
+
+                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a({0x0, saturation, saturation, 0xf}));
+            }
+
+            /**
              * @brief Draws the blue boarder when a element is highlighted
              * @note Override this if you have a element that e.g requires a non-rectangular focus
              * 
@@ -1126,6 +1146,11 @@ namespace tsl {
                 }
 
                 renderer->drawRect(this->m_x, this->m_y, this->m_width, this->m_height, a(0xF000));
+
+                if (this->m_clickAnimationProgress > 0) {
+                    this->drawClickAnimation(renderer);
+                    this->m_clickAnimationProgress--;
+                }
 
                 renderer->drawRect(this->m_x + x - 4, this->m_y + y - 4, this->m_width + 8, 4, a(highlightColor));
                 renderer->drawRect(this->m_x + x - 4, this->m_y + y + this->m_height, this->m_width + 8, 4, a(highlightColor));
@@ -1207,6 +1232,7 @@ namespace tsl {
         protected:
             constexpr static inline auto a = &gfx::Renderer::a;
             bool m_focused = false;
+            u8 m_clickAnimationProgress = 0;
 
         private:
             friend class Gui;
@@ -1379,17 +1405,12 @@ namespace tsl {
                     size_t written = 0;
                     renderer->drawString(this->m_text.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent, this->m_maxWidth, &written);
                     this->m_trunctuated = written < this->m_text.length();
+
                     if (this->m_trunctuated) {
                         this->m_maxScroll = this->m_text.length() + 8;
                         this->m_scrollText = this->m_text + "        " + this->m_text;
                         this->m_ellipsisText = hlp::limitStringLength(this->m_text, written);
                     }
-                }
-
-                if (this->m_selectFactor) {
-                    u8 saturation = tsl::style::ListItemHighlightSaturation * (float(this->m_selectFactor) / float(tsl::style::ListItemHighlightLength));
-                    renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a({0x0, saturation, saturation, 0xf}));
-                    --this->m_selectFactor;
                 }
 
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
@@ -1399,22 +1420,22 @@ namespace tsl {
                 if (this->m_trunctuated) {
                     if (this->m_focused) {
                         if (this->m_scroll) {
-                            if ((this->m_counter % 20) == 0) {
+                            if ((this->m_scrollAnimationCounter % 20) == 0) {
                                 this->m_scrollOffset++;
                                 if (this->m_scrollOffset >= this->m_maxScroll) {
                                     this->m_scrollOffset = 0;
                                     this->m_scroll = false;
-                                    this->m_counter = 0;
+                                    this->m_scrollAnimationCounter = 0;
                                 }
                             }
                             text = this->m_scrollText.c_str() + this->m_scrollOffset;
                         } else {
-                            if (this->m_counter > 60) {
+                            if (this->m_scrollAnimationCounter > 60) {
                                 this->m_scroll = true;
-                                this->m_counter = 0;
+                                this->m_scrollAnimationCounter = 0;
                             }
                         }
-                        this->m_counter++;
+                        this->m_scrollAnimationCounter++;
                     } else {
                         text = this->m_ellipsisText.c_str();
                     }
@@ -1430,8 +1451,10 @@ namespace tsl {
             }
 
             virtual bool onClick(u64 keys) {
-                if (keys & KEY_A)
-                    m_selectFactor = tsl::style::ListItemHighlightLength;
+                if (keys & KEY_A) {
+                    this->triggerClickAnimation();
+                    return true;
+                }
 
                 return false;
             }
@@ -1439,7 +1462,7 @@ namespace tsl {
             virtual void setFocused(bool state) override {
                 this->m_scroll = false;
                 this->m_scrollOffset = 0;
-                this->m_counter = 0;
+                this->m_scrollAnimationCounter = 0;
                 this->m_focused = state;
             }
 
@@ -1454,6 +1477,8 @@ namespace tsl {
              */
             virtual inline void setText(const std::string& text) final {
                 this->m_text = text;
+                this->m_scrollText = "";
+                this->m_ellipsisText = "";
                 this->m_maxWidth = 0;
             }
 
@@ -1474,6 +1499,7 @@ namespace tsl {
             std::string m_value = "";
             std::string m_scrollText = "";
             std::string m_ellipsisText = "";
+
             bool m_scroll = false;
             bool m_trunctuated = false;
             bool m_faint = false;
@@ -1481,8 +1507,7 @@ namespace tsl {
             u16 m_maxScroll = 0;
             u16 m_scrollOffset = 0;
             u32 m_maxWidth = 0;
-            u16 m_counter = 0;
-            u8 m_selectFactor = 0;
+            u16 m_scrollAnimationCounter = 0;
         };
 
         /**
@@ -1507,14 +1532,14 @@ namespace tsl {
 
             virtual ~ToggleListItem() {}
 
-            virtual bool onClick(u64 keys) {
+            virtual bool onClick(u64 keys) override {
                 if (keys & KEY_A) {
                     this->m_state = !this->m_state;
 
                     this->setState(this->m_state);
                     this->m_stateChangedListener(this->m_state);
 
-                    return true;
+                    return ListItem::onClick(keys);
                 }
 
                 return false;
