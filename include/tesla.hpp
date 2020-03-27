@@ -1317,7 +1317,7 @@ namespace tsl {
              * 
              * @param title Subtitle to change to
              */
-            virtual void setSubTitle(const std::string &subtitle) final {
+            virtual void setSubtitle(const std::string &subtitle) final {
                 this->m_subtitle = subtitle;
             }
 
@@ -2284,18 +2284,36 @@ namespace tsl {
 
                     shData->keysDown = 0;
                     shData->keysHeld = 0;
+                    shData->joyStickPosLeft  = { 0 };
+                    shData->joyStickPosRight = { 0 };
 
                     // Combine input from all controllers
                     for (u8 controller = 0; controller < 8; controller++) {
                         if (hidIsControllerConnected(static_cast<HidControllerID>(controller))) {
                             shData->keysDown |= hidKeysDown(static_cast<HidControllerID>(controller));
                             shData->keysHeld |= hidKeysHeld(static_cast<HidControllerID>(controller));
+
+                            JoystickPosition joyStickPosLeft, joyStickPosRight;
+                            hidJoystickRead(&joyStickPosLeft, static_cast<HidControllerID>(controller), HidControllerJoystick::JOYSTICK_LEFT);
+                            hidJoystickRead(&joyStickPosRight, static_cast<HidControllerID>(controller), HidControllerJoystick::JOYSTICK_RIGHT);
+
+                            if (joyStickPosLeft.dx > 0 && joyStickPosLeft.dx > shData->joyStickPosLeft.dx)
+                                shData->joyStickPosLeft.dx = joyStickPosLeft.dx;
+                            if (joyStickPosLeft.dx < 0 && joyStickPosLeft.dx < shData->joyStickPosLeft.dx)
+                                shData->joyStickPosLeft.dx = joyStickPosLeft.dx;
+                            if (joyStickPosLeft.dy > 0 && joyStickPosLeft.dy > shData->joyStickPosLeft.dy)
+                                shData->joyStickPosLeft.dy = joyStickPosLeft.dy;
+                            if (joyStickPosLeft.dy < 0 && joyStickPosLeft.dy < shData->joyStickPosLeft.dy)
+                                shData->joyStickPosLeft.dy = joyStickPosLeft.dy;
                         }
                     }
 
                     if (hidIsControllerConnected(CONTROLLER_HANDHELD)) {
                         shData->keysDown |= hidKeysDown(CONTROLLER_HANDHELD);
                         shData->keysHeld |= hidKeysHeld(CONTROLLER_HANDHELD);
+
+                        hidJoystickRead(&shData->joyStickPosLeft, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_LEFT);
+                        hidJoystickRead(&shData->joyStickPosRight, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_RIGHT);
                     }
 
                     // Read in touch positions
@@ -2303,10 +2321,6 @@ namespace tsl {
                         hidTouchRead(&shData->touchPos, 0);
                     else 
                         shData->touchPos = { 0 };
-
-                    // Read in joystick values
-                    hidJoystickRead(&shData->joyStickPosLeft, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_LEFT);
-                    hidJoystickRead(&shData->joyStickPosRight, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_RIGHT);
 
                     if (((shData->keysHeld & tsl::cfg::launchCombo) == tsl::cfg::launchCombo) && shData->keysDown & tsl::cfg::launchCombo) {
                         if (shData->overlayOpen) {
