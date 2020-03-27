@@ -95,6 +95,9 @@ namespace tsl {
 
         namespace color {
             constexpr u16 ColorTransparent = 0x0000;    ///< Transparent color
+            constexpr u16 ColorHighlight   = 0xFDF0;
+            constexpr u16 ColorFrame       = 0xF777;
+            constexpr u16 ColorHandle      = 0xF555;
         }
     }
 
@@ -603,6 +606,62 @@ namespace tsl {
                         this->setPixelBlendDst(x1, y1, color);
             }
 
+            void drawCircle(u16 centerX, u16 centerY, u16 radius, bool filled, Color color) {
+                s16 x = radius;
+                s16 y = 0;
+                s16 radiusError = 0;
+                s16 xChange = 1 - (radius << 1);
+                s16 yChange = 0;
+                
+                while (x >= y) {
+                    if(filled) {
+                        for (s16 i = centerX - x; i <= centerX + x; i++) {
+                            s16 y0 = centerY + y;
+                            s16 y1 = centerY - y;
+                            s16 x0 = i;
+                            
+                            this->setPixel(x0, y0, color);
+                            this->setPixel(x0, y1, color);
+                        }
+                        
+                        for (s16 i = centerX - y; i <= centerX + y; i++) {
+                            s16 y0 = centerY + x;
+                            s16 y1 = centerY - x;
+                            s16 x0 = i;
+
+                            this->setPixel(x0, y0, color);
+                            this->setPixel(x0, y1, color);
+                        }
+
+                        y++;
+                        radiusError += yChange;
+                        yChange += 2;
+                        if (((radiusError << 1) + xChange) > 0) {
+                            x--;
+                            radiusError += xChange;
+                            xChange += 2;
+                        }
+                    } else {
+                        this->setPixel(centerX + x, centerY + y, color);
+                        this->setPixel(centerX + y, centerY + x, color);
+                        this->setPixel(centerX - y, centerY + x, color);
+                        this->setPixel(centerX - x, centerY + y, color);
+                        this->setPixel(centerX - x, centerY - y, color);
+                        this->setPixel(centerX - y, centerY - x, color);
+                        this->setPixel(centerX + y, centerY - x, color);
+                        this->setPixel(centerX + x, centerY - y, color);
+                        
+                        if(radiusError <= 0) {
+                            y++;
+                            radiusError += 2 * y + 1;
+                        } else {
+                            x--;
+                            radiusError -= 2 * x + 1;
+                        }
+                    }
+                }
+            }
+
             /**
              * @brief Draws a RGBA8888 bitmap from memory
              * 
@@ -1010,6 +1069,20 @@ namespace tsl {
             }
 
             /**
+             * @brief Called once per frame with the latest HID inputs
+             * 
+             * @param keysDown Buttons pressed in the last frame
+             * @param keysHeld Buttons held down longer than one frame
+             * @param touchInput Last touch position
+             * @param leftJoyStick Left joystick position
+             * @param rightJoyStick Right joystick position
+             * @return Weather or not the input has been consumed
+             */
+            virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchPos, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight) {
+                return false;
+            }
+
+            /**
              * @brief Function called when the element got touched
              * @todo Not yet implemented
              * 
@@ -1049,9 +1122,12 @@ namespace tsl {
              */
             virtual void frame(gfx::Renderer *renderer) final {
                 if (this->m_focused)
-                    this->drawHighlight(renderer);
+                    this->drawFocusBackground(renderer);
 
                 this->draw(renderer);
+
+                if (this->m_focused)
+                    this->drawHighlight(renderer);
             }
 
             /**
@@ -1096,6 +1172,21 @@ namespace tsl {
                 u8 saturation = tsl::style::ListItemHighlightSaturation * (float(this->m_clickAnimationProgress) / float(tsl::style::ListItemHighlightLength));
 
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a({0x0, saturation, saturation, 0xf}));
+            }
+            
+            /**
+             * @brief Draws the back background when a element is highlighted
+             * @note Override this if you have a element that e.g requires a non-rectangular focus
+             * 
+             * @param renderer Renderer
+             */
+            virtual void drawFocusBackground(gfx::Renderer *renderer) {
+                renderer->drawRect(this->m_x, this->m_y, this->m_width, this->m_height, a(0xF000));
+
+                if (this->m_clickAnimationProgress > 0) {
+                    this->drawClickAnimation(renderer);
+                    this->m_clickAnimationProgress--;
+                }
             }
 
             /**
@@ -1143,13 +1234,6 @@ namespace tsl {
                         x = std::clamp(x, -amplitude, amplitude);
                         y = std::clamp(y, -amplitude, amplitude);
                     }
-                }
-
-                renderer->drawRect(this->m_x, this->m_y, this->m_width, this->m_height, a(0xF000));
-
-                if (this->m_clickAnimationProgress > 0) {
-                    this->drawClickAnimation(renderer);
-                    this->m_clickAnimationProgress--;
                 }
 
                 renderer->drawRect(this->m_x + x - 4, this->m_y + y - 4, this->m_width + 8, 4, a(highlightColor));
@@ -1234,14 +1318,6 @@ namespace tsl {
             bool m_focused = false;
             u8 m_clickAnimationProgress = 0;
 
-        private:
-            friend class Gui;
-
-            u16 m_x = 0, m_y = 0, m_width = 0, m_height = 0;
-            Element *m_parent = nullptr;
-
-            std::function<bool(u64 keys)> m_clickListener = [](u64) { return false; };
-
             // Highlight shake animation
             bool m_highlightShaking = false;
             std::chrono::system_clock::time_point m_highlightShakingStartTime;
@@ -1262,6 +1338,15 @@ namespace tsl {
 
                 return roundf(a * exp(-(tau * t_) * sin(w * t_)));
             }
+
+        private:
+            friend class Gui;
+
+            u16 m_x = 0, m_y = 0, m_width = 0, m_height = 0;
+            Element *m_parent = nullptr;
+
+            std::function<bool(u64 keys)> m_clickListener = [](u64) { return false; };
+
         };
 
         /**
@@ -1592,7 +1677,7 @@ namespace tsl {
              * 
              * @param text Text
              */
-            virtual inline void setText(const std::string& text) final {
+            virtual inline void setText(const std::string& text) {
                 this->m_text = text;
                 this->m_scrollText = "";
                 this->m_ellipsisText = "";
@@ -1701,6 +1786,149 @@ namespace tsl {
             std::function<void(bool)> m_stateChangedListener = [](bool){};
         };
 
+        /**
+         * @brief A customizable analog trackbar going from 0% to 100%
+         * 
+         */
+        class TrackBar : public ListItem {
+        public:
+            /**
+             * @brief Constructor
+             * 
+             * @param text Initial description text
+             * @param initialState Is the toggle set to On or Off initially
+             * @param onValue Value drawn if the toggle is on
+             * @param offValue Value drawn if the toggle is off
+             */
+            TrackBar(const char icon[3]) : ListItem(icon), m_icon(icon) { }
+
+            virtual ~TrackBar() {}
+
+            virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) {
+                if (keysHeld & KEY_LEFT) {
+                    if (this->m_value > 0) {
+                        this->m_value--;
+                        this->m_valueChangedListener(this->m_value);
+                        return true;
+                    }
+                }
+
+                if (keysHeld & KEY_RIGHT) {
+                    if (this->m_value < 100) {
+                        this->m_value++;
+                        this->m_valueChangedListener(this->m_value);
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            virtual void draw(gfx::Renderer *renderer) override {
+                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
+                renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
+
+                renderer->drawString(this->m_icon, false, this->getX() + 15, this->getY() + 45, 23, a({ 0xF, 0xF, 0xF, 0xF }), this->m_maxWidth);
+
+                u16 handlePos = (this->getWidth() - 95) * static_cast<float>(this->m_value) / 100;
+                renderer->drawRect(this->getX() + 60, this->getY() + 35, this->getWidth() - 95, 5, tsl::style::color::ColorFrame);
+                renderer->drawRect(this->getX() + 60, this->getY() + 35, handlePos, 5, tsl::style::color::ColorHighlight);
+
+                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 37, 18, true, tsl::style::color::ColorHandle);
+                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 37, 18, false, tsl::style::color::ColorFrame);
+            }
+
+            virtual void drawFocusBackground(gfx::Renderer *renderer) {
+
+            }
+
+            virtual void drawHighlight(gfx::Renderer *renderer) override {
+                static float counter = 0;
+                const float progress = (std::sin(counter) + 1) / 2;
+                gfx::Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
+                                                static_cast<u8>((0x8 - 0xF) * progress + 0xF), 
+                                                static_cast<u8>((0xC - 0xF) * progress + 0xF), 
+                                                0xF };
+
+                counter += 0.1F;
+
+                u16 handlePos = (this->getWidth() - 95) * static_cast<float>(this->m_value) / 100;
+
+                s32 x = 0;
+                s32 y = 0;
+
+                if (Element::m_highlightShaking) {
+                    auto t = (std::chrono::system_clock::now() - Element::m_highlightShakingStartTime);
+                    if (t >= 100ms)
+                        Element::m_highlightShaking = false;
+                    else {
+                        s32 amplitude = std::rand() % 5 + 5;
+
+                        switch (Element::m_highlightShakingDirection) {
+                            case FocusDirection::Up:
+                                y -= shakeAnimation(t, amplitude);
+                                break;
+                            case FocusDirection::Down:
+                                y += shakeAnimation(t, amplitude);
+                                break;
+                            case FocusDirection::Left:
+                                x -= shakeAnimation(t, amplitude);
+                                break;
+                            case FocusDirection::Right:
+                                x += shakeAnimation(t, amplitude);
+                                break;
+                            default:
+                                break;
+                        }
+
+                        x = std::clamp(x, -amplitude, amplitude);
+                        y = std::clamp(y, -amplitude, amplitude);
+                    }
+                }
+
+                for (u8 i = 16; i <= 19; i++) {
+                    renderer->drawCircle(this->getX() + 62 + x + handlePos, this->getY() + 37 + y, i, false, a(highlightColor));
+                }
+            }
+
+            /**
+             * @brief Gets the current value of the trackbar
+             * 
+             * @return State
+             */
+            virtual inline u8 getProgress() {
+                return this->m_value;
+            }
+
+            /**
+             * @brief Sets the current state of the toggle. Updates the Value
+             * 
+             * @param state State
+             */
+            virtual void setProgress(u8 value) {
+                this->m_value = value;
+            }
+
+            /**
+             * @brief Adds a listener that gets called whenever the state of the toggle changes
+             * 
+             * @param stateChangedListener Listener with the current state passed in as parameter
+             */
+            void setValueChangedListener(std::function<void(u8)> valueChangedListener) {
+                this->m_valueChangedListener = valueChangedListener;
+            } 
+
+        protected:
+            const char *m_icon;
+            u8 m_value;
+
+            std::function<void(u8)> m_valueChangedListener = [](u8){};
+
+        private:
+            virtual inline void setText(const std::string& text) {}
+            virtual inline void setValue(const std::string& value, bool faint = false) {}
+        };
+
 
         /**
          * @brief A List containing list items
@@ -1766,8 +1994,9 @@ namespace tsl {
 
             /**
              * @brief Removes all children from the list
+             * @warning When clearing a list, make sure none of the its children are focused. Call \ref Gui::removeFocus before.
              */
-            virtual void clear() final {              
+            virtual void clear() final {     
                 for (auto& item : this->m_items)
                     delete item.element;
 
@@ -2216,6 +2445,12 @@ namespace tsl {
             elm::Element *parentElement = currentFocus;
             do {
                 handled = parentElement->onClick(keysDown);
+                parentElement = parentElement->getParent();
+            } while (!handled && parentElement != nullptr);
+
+            parentElement = currentFocus;
+            do {
+                handled = parentElement->handleInput(keysDown, keysHeld, touchPos, joyStickPosLeft, joyStickPosRight);
                 parentElement = parentElement->getParent();
             } while (!handled && parentElement != nullptr);
 
