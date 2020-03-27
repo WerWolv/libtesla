@@ -1303,6 +1303,24 @@ namespace tsl {
                 }
             }
 
+            /**
+             * @brief Changes the title of the menu
+             * 
+             * @param title Title to change to
+             */
+            virtual void setTitle(const std::string &title) final {
+                this->m_title = title;
+            }
+
+            /**
+             * @brief Changes the subtitle of the menu
+             * 
+             * @param title Subtitle to change to
+             */
+            virtual void setSubTitle(const std::string &subtitle) final {
+                this->m_subtitle = subtitle;
+            }
+
         protected:
             Element *m_contentElement = nullptr;
 
