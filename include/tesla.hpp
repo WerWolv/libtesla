@@ -1804,7 +1804,7 @@ namespace tsl {
 
             virtual ~TrackBar() {}
 
-            virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) {
+            virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
                 if (keysHeld & KEY_LEFT) {
                     if (this->m_value > 0) {
                         this->m_value--;
@@ -1927,6 +1927,87 @@ namespace tsl {
         private:
             virtual inline void setText(const std::string& text) {}
             virtual inline void setValue(const std::string& value, bool faint = false) {}
+        };
+
+        class StepTrackBar : public TrackBar {
+        public:
+            /**
+             * @brief Constructor
+             * 
+             * @param text Initial description text
+             * @param initialState Is the toggle set to On or Off initially
+             * @param onValue Value drawn if the toggle is on
+             * @param offValue Value drawn if the toggle is off
+             */
+            StepTrackBar(const char icon[3], std::initializer_list<std::string> stepDescriptions) 
+                : TrackBar(icon), m_numSteps(stepDescriptions.size()), m_stepDescriptions(stepDescriptions.begin(), stepDescriptions.end()) { }
+
+            virtual ~StepTrackBar() {}
+
+            virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
+                return false;
+            }
+
+            virtual bool onClick(u64 key) {
+                if (key & KEY_LEFT) {
+                    if (this->m_value > 0) {
+                        this->m_value = std::max(this->m_value - (100 / (this->m_numSteps - 1)), 0);
+                        this->m_valueChangedListener(this->getProgress());
+                        return true;
+                    }
+                }
+
+                if (key & KEY_RIGHT) {
+                    if (this->m_value < 100) {
+                        this->m_value = std::min(this->m_value + (100 / (this->m_numSteps - 1)), 100);
+                        this->m_valueChangedListener(this->getProgress());
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            virtual void draw(gfx::Renderer *renderer) override {
+
+                u16 trackBarWidth = this->getWidth() - 95;
+                u16 stepWidth = trackBarWidth / (this->m_numSteps - 1);
+
+                for (u8 i = 0; i < this->m_numSteps; i++) {
+                    renderer->drawRect(this->getX() + 60 + stepWidth * i, this->getY() + 45, 1, 10, tsl::style::color::ColorFrame);
+                }
+
+                u8 currentDescIndex = std::clamp(this->m_value / (100 / (this->m_numSteps - 1)), 0, this->m_numSteps - 1);
+
+                auto [descWidth, descHeight] = renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, 0, 0, 15, tsl::style::color::ColorTransparent);
+                renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, ((this->getX() + 60) + (this->getWidth() - 95) / 2) - (descWidth / 2), this->getY() + 20, 15, tsl::style::color::ColorFrame);
+
+                TrackBar::draw(renderer);
+            }
+
+            /**
+             * @brief Gets the current value of the trackbar
+             * 
+             * @return State
+             */
+            virtual inline u8 getProgress() override {
+                return this->m_value / (100 / (this->m_numSteps - 1));
+            }
+
+            /**
+             * @brief Sets the current state of the toggle. Updates the Value
+             * 
+             * @param state State
+             */
+            virtual void setProgress(u8 value) override {
+                value = std::min(value, u8(this->m_numSteps - 1));
+                this->m_value = value * (100 / (this->m_numSteps - 1));
+            }
+
+        protected:
+            const char *m_icon;
+            u8 m_numSteps;
+            std::vector<std::string> m_stepDescriptions;
         };
 
 
