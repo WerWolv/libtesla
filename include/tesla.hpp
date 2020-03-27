@@ -1264,6 +1264,34 @@ namespace tsl {
             }
         };
 
+        /**
+         * @brief A Element that exposes the renderer directly to draw custom views easily
+         */
+        class CustomDrawer : public Element {
+        public:
+            /**
+             * @brief Constructor
+             * @note This element should only be used to draw static things the user cannot interact with e.g info text, images, etc.
+             * 
+             * @param renderFunc Callback that will be called once every frame to draw this view
+             */
+            CustomDrawer(std::function<void(gfx::Renderer* r, u16 x, u16 y, u16 w, u16 h)> renderFunc) : Element(), m_renderFunc(renderFunc) {}
+            virtual ~CustomDrawer() {}
+
+            virtual void draw(gfx::Renderer* renderer) override {
+                renderer->enableScissoring(this->getX(), this->getY(), this->getWidth(), this->getHeight());
+                this->m_renderFunc(renderer, this->getX(), this->getY(), this->getWidth(), this->getHeight());
+                renderer->disableScissoring();
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+
+            }
+
+        private:
+            std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> m_renderFunc;
+        };
+
 
         /**
          * @brief The base frame which can contain another view
@@ -1351,6 +1379,95 @@ namespace tsl {
             Element *m_contentElement = nullptr;
 
             std::string m_title, m_subtitle;
+        };
+
+        /**
+         * @brief The base frame which can contain another view with a customizable header
+         * 
+         */
+        class HeaderOverlayFrame : public Element {
+        public:
+            HeaderOverlayFrame() : Element() {}
+            virtual ~HeaderOverlayFrame() {
+                if (this->m_contentElement != nullptr)
+                    delete this->m_contentElement;
+
+                if (this->m_header != nullptr)
+                    delete this->m_header;
+            }
+
+            virtual void draw(gfx::Renderer *renderer) override {
+                renderer->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
+
+                renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
+                renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
+
+                if (this->m_header != nullptr)
+                    this->m_header->frame(renderer);
+
+                if (this->m_contentElement != nullptr)
+                    this->m_contentElement->frame(renderer);
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
+
+                if (this->m_contentElement != nullptr) {
+                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 175, parentWidth - 85, parentHeight - 90 - 100);
+                    this->m_contentElement->invalidate();
+                }
+
+                if (this->m_header != nullptr) {
+                    this->m_header->setBoundaries(parentX, parentY, parentWidth, 150);
+                    this->m_header->invalidate();
+                }
+            }
+
+            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
+                if (this->m_contentElement != nullptr)
+                    return this->m_contentElement->requestFocus(oldFocus, direction);
+                else
+                    return nullptr;
+            }
+
+            /**
+             * @brief Sets the content of the frame
+             * 
+             * @param content Element
+             */
+            virtual void setContent(Element *content) final {
+                if (this->m_contentElement != nullptr)
+                    delete this->m_contentElement;
+
+                this->m_contentElement = content;
+
+                if (content != nullptr) {
+                    this->m_contentElement->setParent(this);
+                    this->invalidate();
+                }
+            }
+
+            /**
+             * @brief Sets the header of the frame
+             * 
+             * @param header Header custom drawer
+             */
+            virtual void setHeader(CustomDrawer *header) final {
+                if (this->m_header != nullptr)
+                    delete this->m_header;
+
+                this->m_header = header;
+
+                if (header != nullptr) {
+                    this->m_header->setParent(this);
+                    this->invalidate();
+                }
+            }
+
+        protected:
+            Element *m_contentElement = nullptr;
+            CustomDrawer *m_header = nullptr;
+
         };
 
         /**
@@ -1721,32 +1838,6 @@ namespace tsl {
             u16 m_offset = 0;
             u16 m_entriesShown = 5;
         };
-
-        /**
-         * @brief A Element that exposes the renderer directly to draw custom views easily
-         */
-        class CustomDrawer : public Element {
-            public:
-                /**
-                 * @brief Constructor
-                 * @note This element should only be used to draw static things the user cannot interact with e.g info text, images, etc.
-                 * 
-                 * @param renderFunc Callback that will be called once every frame to draw this view
-                 */
-                CustomDrawer(std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> renderFunc) : Element(), m_renderFunc(renderFunc) {}
-                virtual ~CustomDrawer() {}
-
-                virtual void draw(gfx::Renderer* renderer) override {
-                    this->m_renderFunc(renderer, this->getX(), this->getY(), this->getWidth(), this->getHeight());
-                }
-
-                virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
-                    this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
-                }
-
-            private:
-                std::function<void(gfx::Renderer*, u16 x, u16 y, u16 w, u16 h)> m_renderFunc;
-            };
 
     }
 
