@@ -89,7 +89,8 @@ namespace tsl {
     }
 
     namespace style {
-        constexpr u32 ListItemDefaultHeight = 72;       ///< Height of a standard ListItem
+        constexpr u32 ListItemDefaultHeight = 70;       ///< Standard list item height
+        constexpr u32 TrackBarDefaultHeight = 90;      ///< Standard track bar height
         constexpr u8 ListItemHighlightSaturation = 0x6; ///< Maximum saturation of Listitem highlights
         constexpr u8 ListItemHighlightLength = 22;      ///< Maximum length of Listitem highlights
 
@@ -1439,6 +1440,7 @@ namespace tsl {
 
             virtual void draw(gfx::Renderer *renderer) override {
                 renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
+                renderer->drawRect(tsl::cfg::FramebufferWidth - 1, 0, 1, tsl::cfg::FramebufferHeight, a(0xF222));
 
                 renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
                 renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorDescription));
@@ -1661,7 +1663,7 @@ namespace tsl {
                 }
                 this->m_itemsToAdd.clear();
 
-                renderer->enableScissoring(this->getX(), this->getY(), this->getWidth(), this->getHeight());
+                renderer->enableScissoring(this->getX(), this->getY() - 5, this->getWidth(), this->getHeight() + 4);
 
                 for (auto &entry : this->m_items) {
                     if (entry->getY() + entry->getHeight() > this->getY() && entry->getY() < this->getY() + this->getHeight()) {
@@ -1899,9 +1901,10 @@ namespace tsl {
             }
 
             virtual bool onClick(u64 keys) {
-                if (keys & KEY_A) {
+                if (keys & KEY_A)
                     this->triggerClickAnimation();
-                }
+                else if (keys & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT))
+                    this->m_clickAnimationProgress = 0;
 
                 return Element::onClick(keys);
             }
@@ -2104,16 +2107,20 @@ namespace tsl {
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
                 renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
 
-                renderer->drawString(this->m_icon, false, this->getX() + 15, this->getY() + 45, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
+                renderer->drawString(this->m_icon, false, this->getX() + 15, this->getY() + 50, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
 
                 u16 handlePos = (this->getWidth() - 95) * static_cast<float>(this->m_value) / 100;
-                renderer->drawCircle(this->getX() + 60, this->getY() + 37, 2, true, a(tsl::style::color::ColorHighlight));
-                renderer->drawCircle(this->getX() + 60 + this->getWidth() - 95, this->getY() + 37, 2, true, a(tsl::style::color::ColorFrame));
-                renderer->drawRect(this->getX() + 60 + handlePos, this->getY() + 35, this->getWidth() - 95 - handlePos, 5, a(tsl::style::color::ColorFrame));
-                renderer->drawRect(this->getX() + 60, this->getY() + 35, handlePos, 5, a(tsl::style::color::ColorHighlight));
+                renderer->drawCircle(this->getX() + 60, this->getY() + 42, 2, true, a(tsl::style::color::ColorHighlight));
+                renderer->drawCircle(this->getX() + 60 + this->getWidth() - 95, this->getY() + 42, 2, true, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX() + 60 + handlePos, this->getY() + 40, this->getWidth() - 95 - handlePos, 5, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX() + 60, this->getY() + 40, handlePos, 5, a(tsl::style::color::ColorHighlight));
 
-                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 37, 18, true, a(tsl::style::color::ColorHandle));
-                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 37, 18, false, a(tsl::style::color::ColorFrame));
+                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 42, 18, true, a(tsl::style::color::ColorHandle));
+                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 42, 18, false, a(tsl::style::color::ColorFrame));
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                this->setBoundaries(this->getX(), this->getY(), this->getWidth(), tsl::style::TrackBarDefaultHeight);
             }
 
             virtual void drawFocusBackground(gfx::Renderer *renderer) {
@@ -2165,7 +2172,7 @@ namespace tsl {
                 }
 
                 for (u8 i = 16; i <= 19; i++) {
-                    renderer->drawCircle(this->getX() + 62 + x + handlePos, this->getY() + 37 + y, i, false, a(highlightColor));
+                    renderer->drawCircle(this->getX() + 62 + x + handlePos, this->getY() + 42 + y, i, false, a(highlightColor));
                 }
             }
 
@@ -2252,7 +2259,7 @@ namespace tsl {
                 u16 stepWidth = trackBarWidth / (this->m_numSteps - 1);
 
                 for (u8 i = 0; i < this->m_numSteps; i++) {
-                    renderer->drawRect(this->getX() + 60 + stepWidth * i, this->getY() + 45, 1, 10, a(tsl::style::color::ColorFrame));
+                    renderer->drawRect(this->getX() + 60 + stepWidth * i, this->getY() + 50, 1, 10, a(tsl::style::color::ColorFrame));
                 }
 
                 u8 currentDescIndex = std::clamp(this->m_value / (100 / (this->m_numSteps - 1)), 0, this->m_numSteps - 1);
