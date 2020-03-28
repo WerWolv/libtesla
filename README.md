@@ -14,7 +14,7 @@ It's main goal is to make sure all overlays look and feel similar and don't diff
     <img src="https://i.imgur.com/nBUc7ps.jpg" style="width: 50%; float: right">
 </div>
 
-`Or rather screen pictures. Overlays do NOT show up on Screenshots.`
+`Overlays do NOT show up on Screenshots. These pictures were taken using a capture card`
 
 ## Example
 
