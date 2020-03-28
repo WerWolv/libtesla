@@ -1635,9 +1635,8 @@ namespace tsl {
             /**
              * @brief Constructor
              * 
-             * @param entriesShown Amount of items displayed in the list at once before scrolling starts
              */
-            List(u16 entriesShown = 5) : Element(), m_entriesShown(entriesShown) {}
+            List() : Element() {}
             virtual ~List() {
                 for (auto& item : this->m_items)
                     delete item;
@@ -1673,17 +1672,21 @@ namespace tsl {
 
                 renderer->disableScissoring();
 
-                float scrollbarHeight = static_cast<float>(this->getHeight() * this->getHeight()) / this->m_listHeight;
-                float scrollbarOffset = (static_cast<double>(this->m_offset)) / static_cast<double>(this->m_listHeight - this->getHeight()) * (this->getHeight() - std::ceil(scrollbarHeight));
-                renderer->drawRect(this->getX() + this->getWidth() + 10, this->getY() + scrollbarOffset, 5, scrollbarHeight - 50, a(tsl::style::color::ColorHandle));
-                renderer->drawCircle(this->getX() + this->getWidth() + 12, this->getY() + scrollbarOffset, 2, true, a(tsl::style::color::ColorHandle));
-                renderer->drawCircle(this->getX() + this->getWidth() + 12, this->getY() + scrollbarOffset + scrollbarHeight - 50, 2, true, a(tsl::style::color::ColorHandle));
+                if (this->m_listHeight > this->getHeight()) {
+                    float scrollbarHeight = static_cast<float>(this->getHeight() * this->getHeight()) / this->m_listHeight;
+                    float scrollbarOffset = (static_cast<double>(this->m_offset)) / static_cast<double>(this->m_listHeight - this->getHeight()) * (this->getHeight() - std::ceil(scrollbarHeight));
+                    
+                    renderer->drawRect(this->getX() + this->getWidth() + 10, this->getY() + scrollbarOffset, 5, scrollbarHeight - 50, a(tsl::style::color::ColorHandle));
+                    renderer->drawCircle(this->getX() + this->getWidth() + 12, this->getY() + scrollbarOffset, 2, true, a(tsl::style::color::ColorHandle));
+                    renderer->drawCircle(this->getX() + this->getWidth() + 12, this->getY() + scrollbarOffset + scrollbarHeight - 50, 2, true, a(tsl::style::color::ColorHandle));
+                    
+                    float prevOffset = this->m_offset;
+                    this->m_offset += ((this->m_nextOffset) - this->m_offset) * 0.1F;
 
-                float prevOffset = this->m_offset;
-                this->m_offset += (this->m_nextOffset - this->m_offset) * 0.1F;
+                    if (static_cast<u32>(prevOffset) != static_cast<u32>(this->m_offset))
+                        this->invalidate();
+                }
 
-                if (static_cast<u32>(prevOffset) != static_cast<u32>(this->m_offset))
-                    this->invalidate();
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
@@ -1804,8 +1807,7 @@ namespace tsl {
             u16 m_focusedIndex = 0;
 
             float m_offset = 0, m_nextOffset = 0;
-            u32 m_listHeight = 0;
-            u16 m_entriesShown = 5;
+            s32 m_listHeight = 0;
 
             bool m_clearList = false;
             std::vector<Element *> m_itemsToAdd;
@@ -1813,6 +1815,13 @@ namespace tsl {
         private:
 
             virtual void updateScrollOffset() {
+                if (this->m_listHeight <= this->getHeight()) {
+                    this->m_nextOffset = 0;
+                    this->m_offset = 0;
+
+                    return;
+                }
+
                 this->m_nextOffset = 0;
                 for (u16 i = 0; i < this->m_focusedIndex; i++)
                     this->m_nextOffset += this->m_items[i]->getHeight();
