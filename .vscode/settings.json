@@ -52,6 +52,7 @@
         "cinttypes": "cpp",
         "typeinfo": "cpp",
         "map": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "list": "cpp"
     }
 }

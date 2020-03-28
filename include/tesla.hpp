@@ -1671,6 +1671,12 @@ namespace tsl {
 
                 renderer->disableScissoring();
 
+                float scrollbarHeight = static_cast<float>(this->getHeight() * this->getHeight()) / this->m_listHeight;
+                float scrollbarOffset = (static_cast<double>(this->m_offset)) / static_cast<double>(this->m_listHeight - this->getHeight()) * (this->getHeight() - std::ceil(scrollbarHeight));
+                renderer->drawRect(this->getX() + this->getWidth() + 10, this->getY() + scrollbarOffset, 5, scrollbarHeight - 50, a(tsl::style::color::ColorHandle));
+                renderer->drawCircle(this->getX() + this->getWidth() + 12, this->getY() + scrollbarOffset, 2, true, a(tsl::style::color::ColorHandle));
+                renderer->drawCircle(this->getX() + this->getWidth() + 12, this->getY() + scrollbarOffset + scrollbarHeight - 50, 2, true, a(tsl::style::color::ColorHandle));
+
                 float prevOffset = this->m_offset;
                 this->m_offset += (this->m_nextOffset - this->m_offset) * 0.1F;
 
@@ -1809,7 +1815,7 @@ namespace tsl {
                 for (u16 i = 0; i < this->m_focusedIndex; i++)
                     this->m_nextOffset += this->m_items[i]->getHeight();
 
-                this->m_nextOffset -= this->getHeight() / 4;
+                this->m_nextOffset -= this->getHeight() / 3;
                 
                 if (this->m_nextOffset < 0)
                     this->m_nextOffset = 0;
