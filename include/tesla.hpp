@@ -594,7 +594,7 @@ namespace tsl {
                 end.r = this->blendColor(src.r, dst.r, dst.a);
                 end.g = this->blendColor(src.g, dst.g, dst.a);
                 end.b = this->blendColor(src.b, dst.b, dst.a);
-                end.a = src.a;
+                end.a = 0xF;
 
                 this->setPixel(x, y, end);
             }
@@ -622,7 +622,7 @@ namespace tsl {
                 end.r = this->blendColor(src.r, dst.r, dst.a);
                 end.g = this->blendColor(src.g, dst.g, dst.a);
                 end.b = this->blendColor(src.b, dst.b, dst.a);
-                end.a = dst.a;
+                end.a = 0xF;
 
                 this->setPixel(x, y, end);
             }
@@ -2142,7 +2142,7 @@ namespace tsl {
                 gfx::Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
                                                 static_cast<u8>((0x8 - 0xF) * progress + 0xF), 
                                                 static_cast<u8>((0xC - 0xF) * progress + 0xF), 
-                                                0xF };
+                                                static_cast<u8>((0x6 - 0xD) * progress + 0xD) };
 
                 counter += 0.1F;
 
