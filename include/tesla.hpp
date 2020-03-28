@@ -476,7 +476,7 @@ namespace tsl {
         };
 
         struct ScissoringConfig {
-            u16 x, y, w, h;
+            s32 x, y, w, h;
         };
 
         /**
@@ -506,7 +506,7 @@ namespace tsl {
              * @param w Width
              * @param h Height
              */
-            inline void enableScissoring(u16 x, u16 y, u16 w, u16 h) {
+            inline void enableScissoring(s32 x, s32 y, s32 w, s32 h) {
                 if (this->m_scissoring)
                     this->m_scissoringStack.push_back(this->m_currScissorConfig);
                 else
@@ -539,11 +539,14 @@ namespace tsl {
              * @param y Y pos
              * @param color Color
              */
-            inline void setPixel(s16 x, s16 y, Color color) {
+            inline void setPixel(s32 x, s32 y, Color color) {
                 if (x < 0 || y < 0 || x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
                     return;
 
-                static_cast<Color*>(this->getCurrentFramebuffer())[this->getPixelOffset(x, y)] = color;
+                u32 offset = this->getPixelOffset(x, y);
+                
+                if (offset != UINT32_MAX)
+                    static_cast<Color*>(this->getCurrentFramebuffer())[offset] = color;
             }
 
             /**
@@ -567,11 +570,16 @@ namespace tsl {
              * @param y Y pos
              * @param color Color
              */
-            inline void setPixelBlendSrc(s16 x, s16 y, Color color) {
+            inline void setPixelBlendSrc(s32 x, s32 y, Color color) {
                 if (x < 0 || y < 0 || x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
                     return;
 
-                Color src((static_cast<u16*>(this->getCurrentFramebuffer()))[this->getPixelOffset(x, y)]);
+                u32 offset = this->getPixelOffset(x, y);
+                
+                if (offset == UINT32_MAX)
+                    return;
+
+                Color src((static_cast<u16*>(this->getCurrentFramebuffer()))[offset]);
                 Color dst(color);
                 Color end(0);
 
@@ -590,11 +598,16 @@ namespace tsl {
              * @param y Y pos
              * @param color Color
              */
-            inline void setPixelBlendDst(s16 x, s16 y, Color color) {
+            inline void setPixelBlendDst(s32 x, s32 y, Color color) {
                 if (x < 0 || y < 0 || x >= cfg::FramebufferWidth || y >= cfg::FramebufferHeight)
                     return;
 
-                Color src((static_cast<u16*>(this->getCurrentFramebuffer()))[this->getPixelOffset(x, y)]);
+                u32 offset = this->getPixelOffset(x, y);
+                
+                if (offset == UINT32_MAX)
+                    return;
+
+                Color src((static_cast<u16*>(this->getCurrentFramebuffer()))[offset]);
                 Color dst(color);
                 Color end(0);
 
@@ -615,34 +628,34 @@ namespace tsl {
              * @param h Height
              * @param color Color
              */
-            inline void drawRect(s16 x, s16 y, s16 w, s16 h, Color color) {
-                for (s16 x1 = x; x1 < (x + w); x1++)
-                    for (s16 y1 = y; y1 < (y + h); y1++)
+            inline void drawRect(s32 x, s32 y, s32 w, s32 h, Color color) {
+                for (s32 x1 = x; x1 < (x + w); x1++)
+                    for (s32 y1 = y; y1 < (y + h); y1++)
                         this->setPixelBlendDst(x1, y1, color);
             }
 
-            void drawCircle(u16 centerX, u16 centerY, u16 radius, bool filled, Color color) {
-                s16 x = radius;
-                s16 y = 0;
-                s16 radiusError = 0;
-                s16 xChange = 1 - (radius << 1);
-                s16 yChange = 0;
+            void drawCircle(s32 centerX, s32 centerY, u16 radius, bool filled, Color color) {
+                s32 x = radius;
+                s32 y = 0;
+                s32 radiusError = 0;
+                s32 xChange = 1 - (radius << 1);
+                s32 yChange = 0;
                 
                 while (x >= y) {
                     if(filled) {
-                        for (s16 i = centerX - x; i <= centerX + x; i++) {
-                            s16 y0 = centerY + y;
-                            s16 y1 = centerY - y;
-                            s16 x0 = i;
+                        for (s32 i = centerX - x; i <= centerX + x; i++) {
+                            s32 y0 = centerY + y;
+                            s32 y1 = centerY - y;
+                            s32 x0 = i;
                             
                             this->setPixelBlendDst(x0, y0, color);
                             this->setPixelBlendDst(x0, y1, color);
                         }
                         
-                        for (s16 i = centerX - y; i <= centerX + y; i++) {
-                            s16 y0 = centerY + x;
-                            s16 y1 = centerY - x;
-                            s16 x0 = i;
+                        for (s32 i = centerX - y; i <= centerX + y; i++) {
+                            s32 y0 = centerY + x;
+                            s32 y1 = centerY - x;
+                            s32 x0 = i;
 
                             this->setPixelBlendDst(x0, y0, color);
                             this->setPixelBlendDst(x0, y1, color);
@@ -724,12 +737,12 @@ namespace tsl {
              * @param color Text color. Use transparent color to skip drawing and only get the string's dimensions
              * @return Dimensions of drawn string
              */
-            std::pair<u32, u32> drawString(const char* string, bool monospace, u32 x, u32 y, float fontSize, Color color, size_t maxWidth = 0, size_t* written = nullptr) {
+            std::pair<u32, u32> drawString(const char* string, bool monospace, s32 x, s32 y, float fontSize, Color color, ssize_t maxWidth = 0, size_t* written = nullptr) {
                 const size_t stringLength = strlen(string);
 
-                u32 maxX = x;
-                u32 currX = x;
-                u32 currY = y;
+                s32 maxX = x;
+                s32 currX = x;
+                s32 currY = y;
                 u32 prevCharacter = 0;
 
                 u32 i = 0;
@@ -898,13 +911,13 @@ namespace tsl {
              * @param y Y Pos
              * @return Offset
              */
-            const u32 getPixelOffset(u32 x, u32 y) {
+            const u32 getPixelOffset(s32 x, s32 y) {
                 if (this->m_scissoring) {
                     if (x < this->m_currScissorConfig.x ||
                         y < this->m_currScissorConfig.y ||
                         x > this->m_currScissorConfig.x + this->m_currScissorConfig.w ||
                         y > this->m_currScissorConfig.y + this->m_currScissorConfig.h)
-                            return cfg::FramebufferWidth * cfg::FramebufferHeight * 2 + 1;
+                            return UINT32_MAX;
                 }
 
                 u32 tmpPos = ((y & 127) / 16) + (x / 32 * 8) + ((y / 16 / 8) * (((cfg::FramebufferWidth / 2) / 16 * 8)));
@@ -1005,7 +1018,11 @@ namespace tsl {
              * @warning Don't call this before calling \ref startFrame once
              */
             inline void endFrame() {
-                std::memcpy(this->getNextFramebuffer(), this->getCurrentFramebuffer(), this->getFramebufferSize());
+                if (Renderer::s_shouldTakeScreenshot) {
+                    this->captureScreenshotImpl();
+                    Renderer::s_shouldTakeScreenshot = false;
+                }
+
                 this->waitForVSync();
                 framebufferEnd(&this->m_framebuffer);
 
@@ -1030,8 +1047,8 @@ namespace tsl {
                 if (glyphBmp == nullptr)
                     return;
 
-                for (s16 bmpY = 0; bmpY < height; bmpY++) {
-                    for (s16 bmpX = 0; bmpX < width; bmpX++) {
+                for (s32 bmpY = 0; bmpY < height; bmpY++) {
+                    for (s32 bmpX = 0; bmpX < width; bmpX++) {
                         Color tmpColor = color;
                         tmpColor.a = (glyphBmp[width * bmpY + bmpX] >> 4) * (float(tmpColor.a) / 0xF);
                         this->setPixelBlendSrc(x + bmpX, y + bmpY, tmpColor);
