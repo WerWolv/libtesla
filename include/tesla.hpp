@@ -94,13 +94,14 @@ namespace tsl {
         constexpr u8 ListItemHighlightLength = 22;      ///< Maximum length of Listitem highlights
 
         namespace color {
-            constexpr u16 ColorTransparent  = 0x0000;    ///< Transparent color
-            constexpr u16 ColorHighlight    = 0xFDF0;
-            constexpr u16 ColorFrame        = 0xF777;
-            constexpr u16 ColorHandle       = 0xF555;
-            constexpr u16 ColorText         = 0xFFFF;
-            constexpr u16 ColorDescription  = 0xFAAA;
-            constexpr u16 ColorHeaderBar    = 0xFCCC;
+            constexpr u16 ColorFrameBackground  = 0xD000;   ///< Overlay frame background color
+            constexpr u16 ColorTransparent      = 0x0000;   ///< Transparent color
+            constexpr u16 ColorHighlight        = 0xFDF0;   ///< Greenish highlight color
+            constexpr u16 ColorFrame            = 0xF777;   ///< Outer boarder color
+            constexpr u16 ColorHandle           = 0xF555;   ///< Track bar handle color
+            constexpr u16 ColorText             = 0xFFFF;   ///< Standard text color
+            constexpr u16 ColorDescription      = 0xFAAA;   ///< Description text color
+            constexpr u16 ColorHeaderBar        = 0xFCCC;   ///< Category header rectangle color
         }
     }
 
@@ -1141,8 +1142,12 @@ namespace tsl {
 
                 this->draw(renderer);
 
+                renderer->enableScissoring(0, 0, tsl::cfg::FramebufferWidth, tsl::cfg::FramebufferHeight);
+
                 if (this->m_focused)
                     this->drawHighlight(renderer);
+
+                renderer->disableScissoring();
             }
 
             /**
@@ -1412,12 +1417,13 @@ namespace tsl {
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
+                renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
 
                 renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
                 renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorDescription));
 
-                renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
+                renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
+
                 renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(tsl::style::color::ColorText));
 
                 if (this->m_contentElement != nullptr)
@@ -1428,7 +1434,7 @@ namespace tsl {
                 this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
 
                 if (this->m_contentElement != nullptr) {
-                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 175, parentWidth - 85, parentHeight - 73 - 175);
+                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 125, parentWidth - 85, parentHeight - 73 - 125);
                     this->m_contentElement->invalidate();
                 }
             }
@@ -1487,7 +1493,7 @@ namespace tsl {
          */
         class HeaderOverlayFrame : public Element {
         public:
-            HeaderOverlayFrame() : Element() {}
+            HeaderOverlayFrame(u16 headerHeight = 175) : Element(), m_headerHeight(headerHeight) {}
             virtual ~HeaderOverlayFrame() {
                 if (this->m_contentElement != nullptr)
                     delete this->m_contentElement;
@@ -1497,9 +1503,10 @@ namespace tsl {
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
+                renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
 
-                renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
+                renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
+
                 renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(tsl::style::color::ColorText));
 
                 if (this->m_header != nullptr)
@@ -1513,12 +1520,12 @@ namespace tsl {
                 this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
 
                 if (this->m_contentElement != nullptr) {
-                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 175, parentWidth - 85, parentHeight - 73 - 175);
+                    this->m_contentElement->setBoundaries(parentX + 35, parentY + this->m_headerHeight, parentWidth - 85, parentHeight - 73 - this->m_headerHeight);
                     this->m_contentElement->invalidate();
                 }
 
                 if (this->m_header != nullptr) {
-                    this->m_header->setBoundaries(parentX, parentY, parentWidth, 150);
+                    this->m_header->setBoundaries(parentX, parentY, parentWidth, this->m_headerHeight);
                     this->m_header->invalidate();
                 }
             }
@@ -1568,6 +1575,7 @@ namespace tsl {
             Element *m_contentElement = nullptr;
             CustomDrawer *m_header = nullptr;
 
+            u16 m_headerHeight;
         };
 
         /**
@@ -1592,6 +1600,181 @@ namespace tsl {
 
         private:
             gfx::Color m_color;
+        };
+
+
+        /**
+         * @brief A List containing list items
+         * 
+         */
+        class List : public Element {
+        public:
+            /**
+             * @brief Constructor
+             * 
+             * @param entriesShown Amount of items displayed in the list at once before scrolling starts
+             */
+            List(u16 entriesShown = 5) : Element(), m_entriesShown(entriesShown) {}
+            virtual ~List() {
+                for (auto& item : this->m_items)
+                    delete item;
+            }
+
+            virtual void draw(gfx::Renderer *renderer) override {
+                renderer->enableScissoring(this->getX(), this->getY(), this->getWidth(), this->getHeight());
+
+                for (auto &entry : this->m_items) {
+                    if (entry->getY() + entry->getHeight() > this->getY() && entry->getY() < this->getY() + this->getHeight()) {
+                        entry->frame(renderer);
+                    }
+                }
+
+                renderer->disableScissoring();
+
+                this->m_offset += (this->m_nextOffset - this->m_offset) * 0.1F;
+                this->invalidate();
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                s32 y = this->getY() - this->m_offset;
+
+                this->m_listHeight = 0;
+                for (auto &entry : this->m_items)
+                    this->m_listHeight += entry->getHeight();
+
+                for (auto &entry : this->m_items) {
+                    entry->setBoundaries(this->getX(), y, this->getWidth(), entry->getHeight());
+                    entry->invalidate();
+                    y += entry->getHeight();
+                }
+            }
+
+            /**
+             * @brief Adds a new item to the list
+             * 
+             * @param element Element to add
+             * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
+             */
+            virtual void addItem(Element *element, u16 height = 0) final {
+                if (element != nullptr) {
+                    if (height != 0)
+                        element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
+
+                    element->setParent(this);
+                    element->invalidate();
+                    this->m_items.push_back(element);
+                    this->invalidate();
+                }
+
+                if (this->m_items.size() == 1)
+                    this->requestFocus(nullptr, FocusDirection::None);
+            }   
+
+            /**
+             * @brief Removes all children from the list
+             * @warning When clearing a list, make sure none of the its children are focused. Call \ref Gui::removeFocus before.
+             */
+            virtual void clear() final {     
+                for (auto& item : this->m_items)
+                    delete item;
+
+                this->m_items.clear();
+                this->m_offset = 0;
+                this->m_focusedIndex = 0;
+            }
+
+            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
+                Element *newFocus = nullptr;
+
+                if (direction == FocusDirection::None) {
+                    for (u16 i = 0; i < this->m_items.size(); i++) {
+                        newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
+
+                        if (newFocus != nullptr) {
+                            m_focusedIndex = i;
+
+                            this->updateScrollOffset();
+                            return newFocus;
+                        }
+                    }
+                } else {
+                    if (direction == FocusDirection::Down) {
+
+                        for (u16 i = this->m_focusedIndex + 1; i < this->m_items.size(); i++) {
+                            newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
+
+                            if (newFocus != nullptr && newFocus != oldFocus) {
+                                this->m_focusedIndex = i;
+
+                                this->updateScrollOffset();
+                                return newFocus;
+                            }
+                        }
+
+                        return oldFocus;
+                    } else if (direction == FocusDirection::Up) {
+                        if (this->m_focusedIndex > 0) {
+
+                            for (u16 i = this->m_focusedIndex - 1; i >= 0; i--) {
+                                if (i > this->m_items.size() || this->m_items[i] == nullptr)
+                                    return oldFocus;
+                                else
+                                    newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
+                                
+                                if (newFocus != nullptr && newFocus != oldFocus) {
+                                    this->m_focusedIndex = i;
+                                    
+                                    this->updateScrollOffset();
+                                    return newFocus;
+                                }
+                            }
+                        }
+
+                        return oldFocus;
+                    }
+                }
+
+                return oldFocus;
+            }
+
+            /**
+             * @brief Gets the index in the list of the element passed in
+             * 
+             * @param element Element to check
+             * @return Index in list. -1 for if the element isn't a member of the list
+             */
+            virtual s32 getIndexInList(Element *element) {
+                auto it = std::find(this->m_items.begin(), this->m_items.end(), element);
+
+                if (it == this->m_items.end())
+                    return -1;
+
+                return it - this->m_items.begin();
+            }
+
+        protected:
+            std::vector<Element*> m_items;
+            u16 m_focusedIndex = 0;
+
+            float m_offset = 0, m_nextOffset = 0;
+            u32 m_listHeight = 0;
+            u16 m_entriesShown = 5;
+
+        private:
+
+            virtual void updateScrollOffset() {
+                this->m_nextOffset = 0;
+                for (u16 i = 0; i < this->m_focusedIndex; i++)
+                    this->m_nextOffset += this->m_items[i]->getHeight();
+
+                this->m_nextOffset -= this->getHeight() / 4;
+                
+                if (this->m_nextOffset < 0)
+                    this->m_nextOffset = 0;
+
+                if (this->m_nextOffset > (this->m_listHeight - this->getHeight()) + 50)
+                    this->m_nextOffset = (this->m_listHeight - this->getHeight() + 50);
+            }
         };
 
         /**
@@ -1807,11 +1990,19 @@ namespace tsl {
             virtual ~CategoryHeader() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->drawRect(this->getX() + 5, this->getY() + this->getHeight() - 30, 5, 25, tsl::style::color::ColorHeaderBar);
-                renderer->drawString(this->m_text.c_str(), false, this->getX() + 15, this->getY() + this->getHeight() - 10, 18, tsl::style::color::ColorText);
+                renderer->drawRect(this->getX() - 2, this->getY() + this->getHeight() - 30, 5, 23, tsl::style::color::ColorHeaderBar);
+                renderer->drawString(this->m_text.c_str(), false, this->getX() + 13, this->getY() + this->getHeight() - 12, 15, tsl::style::color::ColorText);
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                // Check if the CategoryHeader is part of a list and if it's the first entry in it, half it's height
+                if (List *list = dynamic_cast<List*>(this->getParent()); list != nullptr) {
+                    if (list->getIndexInList(this) == 0) {
+                        this->setBoundaries(this->getX(), this->getY(), this->getWidth(), tsl::style::ListItemDefaultHeight / 2);
+                        return;
+                    }
+                }
+
                 this->setBoundaries(this->getX(), this->getY(), this->getWidth(), tsl::style::ListItemDefaultHeight);
             }
 
@@ -1869,7 +2060,9 @@ namespace tsl {
                 renderer->drawString(this->m_icon, false, this->getX() + 15, this->getY() + 45, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
 
                 u16 handlePos = (this->getWidth() - 95) * static_cast<float>(this->m_value) / 100;
-                renderer->drawRect(this->getX() + 60, this->getY() + 35, this->getWidth() - 95, 5, tsl::style::color::ColorFrame);
+                renderer->drawCircle(this->getX() + 60, this->getY() + 37, 2, true, tsl::style::color::ColorHighlight);
+                renderer->drawCircle(this->getX() + 60 + this->getWidth() - 95, this->getY() + 37, 2, true, tsl::style::color::ColorFrame);
+                renderer->drawRect(this->getX() + 60 + handlePos, this->getY() + 35, this->getWidth() - 95 - handlePos, 5, tsl::style::color::ColorFrame);
                 renderer->drawRect(this->getX() + 60, this->getY() + 35, handlePos, 5, tsl::style::color::ColorHighlight);
 
                 renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 37, 18, true, tsl::style::color::ColorHandle);
@@ -1877,7 +2070,7 @@ namespace tsl {
             }
 
             virtual void drawFocusBackground(gfx::Renderer *renderer) {
-
+                // No background drawn here in HOS
             }
 
             virtual void drawHighlight(gfx::Renderer *renderer) override {
@@ -2045,161 +2238,6 @@ namespace tsl {
         protected:
             u8 m_numSteps = 1;
             std::vector<std::string> m_stepDescriptions;
-        };
-
-
-        /**
-         * @brief A List containing list items
-         * 
-         */
-        class List : public Element {
-        public:
-            /**
-             * @brief Constructor
-             * 
-             * @param entriesShown Amount of items displayed in the list at once before scrolling starts
-             */
-            List(u16 entriesShown = 5) : Element(), m_entriesShown(entriesShown) {}
-            virtual ~List() {
-                for (auto& item : this->m_items)
-                    delete item;
-            }
-
-            virtual void draw(gfx::Renderer *renderer) override {
-                renderer->enableScissoring(this->getX() - 10, this->getY() - 20, this->getWidth() + 20, this->getHeight() + 20);
-
-                for (auto &entry : this->m_items) {
-                    if (entry->getY() + entry->getHeight() > this->getY() && entry->getY() < this->getY() + this->getHeight()) {
-                        entry->frame(renderer);
-                    }
-                }
-
-                renderer->disableScissoring();
-
-                this->m_offset += (this->m_nextOffset - this->m_offset) * 0.1F;
-                this->invalidate();
-            }
-
-            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
-                s32 y = this->getY() - this->m_offset;
-
-                this->m_listHeight = 0;
-                for (auto &entry : this->m_items)
-                    this->m_listHeight += entry->getHeight();
-
-                for (auto &entry : this->m_items) {
-                    entry->setBoundaries(this->getX(), y, this->getWidth(), entry->getHeight());
-                    entry->invalidate();
-                    y += entry->getHeight();
-                }
-            }
-
-            /**
-             * @brief Adds a new item to the list
-             * 
-             * @param element Element to add
-             * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
-             */
-            virtual void addItem(Element *element, u16 height = 0) final {
-                if (element != nullptr) {
-                    if (height != 0)
-                        element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
-
-                    element->setParent(this);
-                    this->m_items.push_back(element);
-                    this->invalidate();
-                }
-
-                if (this->m_items.size() == 1)
-                    this->requestFocus(nullptr, FocusDirection::None);
-            }   
-
-            /**
-             * @brief Removes all children from the list
-             * @warning When clearing a list, make sure none of the its children are focused. Call \ref Gui::removeFocus before.
-             */
-            virtual void clear() final {     
-                for (auto& item : this->m_items)
-                    delete item;
-
-                this->m_items.clear();
-                this->m_offset = 0;
-                this->m_focusedIndex = 0;
-            }
-
-            virtual void updateScrollOffset() {
-                
-                this->m_nextOffset = 0;
-                for (u16 i = 0; i < this->m_focusedIndex; i++)
-                    this->m_nextOffset += this->m_items[i]->getHeight();
-
-                this->m_nextOffset -= this->getHeight() / 4;
-                
-                if (this->m_nextOffset < 0)
-                    this->m_nextOffset = 0;
-
-                if (this->m_nextOffset > (this->m_listHeight - this->getHeight()) + 50)
-                    this->m_nextOffset = (this->m_listHeight - this->getHeight() + 50);
-            }
-
-            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
-                Element *newFocus = nullptr;
-
-                if (direction == FocusDirection::None) {
-                    for (u16 i = 0; i < this->m_items.size(); i++) {
-                        newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
-
-                        if (newFocus != nullptr) {
-                            m_focusedIndex = i;
-
-                            this->updateScrollOffset();
-                            return newFocus;
-                        }
-                    }
-                } else {
-                    if (direction == FocusDirection::Down) {
-
-                        for (u16 i = this->m_focusedIndex + 1; i < this->m_items.size(); i++) {
-                            newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
-
-                            if (newFocus != nullptr && newFocus != oldFocus) {
-                                this->m_focusedIndex = i;
-
-                                this->updateScrollOffset();
-                                return newFocus;
-                            }
-                        }
-
-                        return oldFocus;
-                    } else if (direction == FocusDirection::Up) {
-                        if (this->m_focusedIndex > 0) {
-
-                            for (u16 i = this->m_focusedIndex - 1; i >= 0; i--) {
-                                newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
-                                
-                                if (newFocus != nullptr && newFocus != oldFocus) {
-                                    this->m_focusedIndex = i;
-                                    
-                                    this->updateScrollOffset();
-                                    return newFocus;
-                                }
-                            }
-                        }
-
-                        return oldFocus;
-                    }
-                }
-
-                return oldFocus;
-            }
-
-        protected:
-            std::vector<Element*> m_items;
-            u16 m_focusedIndex = 0;
-
-            float m_offset = 0, m_nextOffset = 0;
-            u32 m_listHeight = 0;
-            u16 m_entriesShown = 5;
         };
 
     }
