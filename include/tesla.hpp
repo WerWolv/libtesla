@@ -1018,11 +1018,6 @@ namespace tsl {
              * @warning Don't call this before calling \ref startFrame once
              */
             inline void endFrame() {
-                if (Renderer::s_shouldTakeScreenshot) {
-                    this->captureScreenshotImpl();
-                    Renderer::s_shouldTakeScreenshot = false;
-                }
-
                 this->waitForVSync();
                 framebufferEnd(&this->m_framebuffer);
 
