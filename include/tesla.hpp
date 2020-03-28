@@ -94,10 +94,13 @@ namespace tsl {
         constexpr u8 ListItemHighlightLength = 22;      ///< Maximum length of Listitem highlights
 
         namespace color {
-            constexpr u16 ColorTransparent = 0x0000;    ///< Transparent color
-            constexpr u16 ColorHighlight   = 0xFDF0;
-            constexpr u16 ColorFrame       = 0xF777;
-            constexpr u16 ColorHandle      = 0xF555;
+            constexpr u16 ColorTransparent  = 0x0000;    ///< Transparent color
+            constexpr u16 ColorHighlight    = 0xFDF0;
+            constexpr u16 ColorFrame        = 0xF777;
+            constexpr u16 ColorHandle       = 0xF555;
+            constexpr u16 ColorText         = 0xFFFF;
+            constexpr u16 ColorDescription  = 0xFAAA;
+            constexpr u16 ColorHeaderBar    = 0xFCCC;
         }
     }
 
@@ -471,6 +474,10 @@ namespace tsl {
             inline Color(u8 r, u8 g, u8 b, u8 a): r(r), g(g), b(b), a(a) {}
         };
 
+        struct ScissoringConfig {
+            u16 x, y, w, h;
+        };
+
         /**
          * @brief Manages the Tesla layer and draws raw data to the screen
          */
@@ -499,19 +506,26 @@ namespace tsl {
              * @param h Height
              */
             inline void enableScissoring(u16 x, u16 y, u16 w, u16 h) {
-                this->m_scissoring = true;
+                if (this->m_scissoring)
+                    this->m_scissoringStack.push_back(this->m_currScissorConfig);
+                else
+                    this->m_scissoring = true;
 
-                this->m_scissorBounds[0] = x;
-                this->m_scissorBounds[1] = y;
-                this->m_scissorBounds[2] = w;
-                this->m_scissorBounds[3] = h;
+                this->m_currScissorConfig = { x, y, w, h };
             }
 
             /**
              * @brief Disables scissoring
              */
             inline void disableScissoring() {
-                this->m_scissoring = false;
+                if (this->m_scissoringStack.size() > 0) {
+                    this->m_currScissorConfig = this->m_scissoringStack.back();
+                    this->m_scissoringStack.pop_back();
+                } 
+                else {
+                    this->m_scissoring = false;
+                    this->m_currScissorConfig = { 0 };
+                }
             }
 
 
@@ -807,7 +821,8 @@ namespace tsl {
             void *m_currentFramebuffer = nullptr;
             
             bool m_scissoring = false;
-            u16 m_scissorBounds[4];
+            ScissoringConfig m_currScissorConfig;
+            std::vector<ScissoringConfig> m_scissoringStack;
 
             stbtt_fontinfo m_stdFont, m_extFont;
 
@@ -884,10 +899,10 @@ namespace tsl {
              */
             const u32 getPixelOffset(u32 x, u32 y) {
                 if (this->m_scissoring) {
-                    if (x < this->m_scissorBounds[0] ||
-                        y < this->m_scissorBounds[1] ||
-                        x > this->m_scissorBounds[0] + this->m_scissorBounds[2] ||
-                        y > this->m_scissorBounds[1] + this->m_scissorBounds[3])
+                    if (x < this->m_currScissorConfig.x ||
+                        y < this->m_currScissorConfig.y ||
+                        x > this->m_currScissorConfig.x + this->m_currScissorConfig.w ||
+                        y > this->m_currScissorConfig.y + this->m_currScissorConfig.h)
                             return cfg::FramebufferWidth * cfg::FramebufferHeight * 2 + 1;
                 }
 
@@ -1250,7 +1265,7 @@ namespace tsl {
              * @param width Width
              * @param height Height
              */
-            virtual void setBoundaries(u16 x, u16 y, u16 width, u16 height) final {
+            virtual void setBoundaries(s32 x, s32 y, s32 width, s32 height) final {
                 this->m_x = x;
                 this->m_y = y;
                 this->m_width = width;
@@ -1271,25 +1286,25 @@ namespace tsl {
              * 
              * @return X position
              */
-            virtual inline u16 getX() final { return this->m_x; }
+            virtual inline s32 getX() final { return this->m_x; }
             /**
              * @brief Gets the element's Y position
              * 
              * @return Y position
              */
-            virtual inline u16 getY() final { return this->m_y; }
+            virtual inline s32 getY() final { return this->m_y; }
             /**
              * @brief Gets the element's Width
              * 
              * @return Width
              */
-            virtual inline u16 getWidth()  final { return this->m_width;  }
+            virtual inline s32 getWidth()  final { return this->m_width;  }
             /**
              * @brief Gets the element's Height
              * 
              * @return Height
              */
-            virtual inline u16 getHeight() final { return this->m_height; }
+            virtual inline s32 getHeight() final { return this->m_height; }
 
             /**
              * @brief Sets the element's parent
@@ -1342,7 +1357,7 @@ namespace tsl {
         private:
             friend class Gui;
 
-            u16 m_x = 0, m_y = 0, m_width = 0, m_height = 0;
+            s32 m_x = 0, m_y = 0, m_width = 0, m_height = 0;
             Element *m_parent = nullptr;
 
             std::function<bool(u64 keys)> m_clickListener = [](u64) { return false; };
@@ -1399,11 +1414,11 @@ namespace tsl {
             virtual void draw(gfx::Renderer *renderer) override {
                 renderer->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
 
-                renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(0xFFFF));
-                renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(0xFFFF));
+                renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
+                renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorDescription));
 
-                renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
-                renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
+                renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
+                renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(tsl::style::color::ColorText));
 
                 if (this->m_contentElement != nullptr)
                     this->m_contentElement->frame(renderer);
@@ -1413,7 +1428,7 @@ namespace tsl {
                 this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
 
                 if (this->m_contentElement != nullptr) {
-                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 175, parentWidth - 85, parentHeight - 90 - 100);
+                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 175, parentWidth - 85, parentHeight - 73 - 175);
                     this->m_contentElement->invalidate();
                 }
             }
@@ -1484,8 +1499,8 @@ namespace tsl {
             virtual void draw(gfx::Renderer *renderer) override {
                 renderer->fillScreen(a({ 0x0, 0x0, 0x0, 0xD }));
 
-                renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(0xFFFF));
-                renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(0xFFFF));
+                renderer->drawRect(15, 720 - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
+                renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(tsl::style::color::ColorText));
 
                 if (this->m_header != nullptr)
                     this->m_header->frame(renderer);
@@ -1498,7 +1513,7 @@ namespace tsl {
                 this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
 
                 if (this->m_contentElement != nullptr) {
-                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 175, parentWidth - 85, parentHeight - 90 - 100);
+                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 175, parentWidth - 85, parentHeight - 73 - 175);
                     this->m_contentElement->invalidate();
                 }
 
@@ -1615,8 +1630,8 @@ namespace tsl {
                     }
                 }
 
-                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
-                renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
+                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
 
                 const char *text = m_text.c_str();
                 if (this->m_trunctuated) {
@@ -1643,13 +1658,13 @@ namespace tsl {
                     }
                 }
 
-                renderer->drawString(text, false, this->getX() + 20, this->getY() + 45, 23, a({ 0xF, 0xF, 0xF, 0xF }), this->m_maxWidth);
+                renderer->drawString(text, false, this->getX() + 20, this->getY() + 45, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
 
-                renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 45, 20, this->m_faint ? a({ 0x6, 0x6, 0x6, 0xF }) : a({ 0x5, 0xC, 0xA, 0xF }));
+                renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 45, 20, this->m_faint ? a(tsl::style::color::ColorDescription) : a(tsl::style::color::ColorHighlight));
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
-                
+                this->setBoundaries(this->getX(), this->getY(), this->getWidth(), tsl::style::ListItemDefaultHeight);
             }
 
             virtual bool onClick(u64 keys) {
@@ -1786,6 +1801,29 @@ namespace tsl {
             std::function<void(bool)> m_stateChangedListener = [](bool){};
         };
 
+        class CategoryHeader : public ListItem {
+        public:
+            CategoryHeader(const std::string &title) : ListItem(title) {}
+            virtual ~CategoryHeader() {}
+
+            virtual void draw(gfx::Renderer *renderer) override {
+                renderer->drawRect(this->getX() + 5, this->getY() + this->getHeight() - 30, 5, 25, tsl::style::color::ColorHeaderBar);
+                renderer->drawString(this->m_text.c_str(), false, this->getX() + 15, this->getY() + this->getHeight() - 10, 18, tsl::style::color::ColorText);
+            }
+
+            virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
+                this->setBoundaries(this->getX(), this->getY(), this->getWidth(), tsl::style::ListItemDefaultHeight);
+            }
+
+            virtual bool onClick(u64 keys) {
+                return false;
+            }
+
+            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
+                return nullptr;
+            }
+        };
+
         /**
          * @brief A customizable analog trackbar going from 0% to 100%
          * 
@@ -1825,10 +1863,10 @@ namespace tsl {
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
-                renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a({ 0x5, 0x5, 0x5, 0xF }));
+                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
 
-                renderer->drawString(this->m_icon, false, this->getX() + 15, this->getY() + 45, 23, a({ 0xF, 0xF, 0xF, 0xF }), this->m_maxWidth);
+                renderer->drawString(this->m_icon, false, this->getX() + 15, this->getY() + 45, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
 
                 u16 handlePos = (this->getWidth() - 95) * static_cast<float>(this->m_value) / 100;
                 renderer->drawRect(this->getX() + 60, this->getY() + 35, this->getWidth() - 95, 5, tsl::style::color::ColorFrame);
@@ -1919,8 +1957,8 @@ namespace tsl {
             } 
 
         protected:
-            const char *m_icon;
-            u8 m_value;
+            const char *m_icon = nullptr;
+            u8 m_value = 0;
 
             std::function<void(u8)> m_valueChangedListener = [](u8){};
 
@@ -1980,7 +2018,7 @@ namespace tsl {
                 u8 currentDescIndex = std::clamp(this->m_value / (100 / (this->m_numSteps - 1)), 0, this->m_numSteps - 1);
 
                 auto [descWidth, descHeight] = renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, 0, 0, 15, tsl::style::color::ColorTransparent);
-                renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, ((this->getX() + 60) + (this->getWidth() - 95) / 2) - (descWidth / 2), this->getY() + 20, 15, tsl::style::color::ColorFrame);
+                renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, ((this->getX() + 60) + (this->getWidth() - 95) / 2) - (descWidth / 2), this->getY() + 20, 15, tsl::style::color::ColorDescription);
 
                 TrackBar::draw(renderer);
             }
@@ -2005,8 +2043,7 @@ namespace tsl {
             }
 
         protected:
-            const char *m_icon;
-            u8 m_numSteps;
+            u8 m_numSteps = 1;
             std::vector<std::string> m_stepDescriptions;
         };
 
@@ -2025,29 +2062,35 @@ namespace tsl {
             List(u16 entriesShown = 5) : Element(), m_entriesShown(entriesShown) {}
             virtual ~List() {
                 for (auto& item : this->m_items)
-                    delete item.element;
+                    delete item;
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
-                u16 i = 0;
+                renderer->enableScissoring(this->getX() - 10, this->getY() - 20, this->getWidth() + 20, this->getHeight() + 20);
+
                 for (auto &entry : this->m_items) {
-                    if (i >= this->m_offset && i < this->m_offset + this->m_entriesShown) {
-                        entry.element->frame(renderer);
+                    if (entry->getY() + entry->getHeight() > this->getY() && entry->getY() < this->getY() + this->getHeight()) {
+                        entry->frame(renderer);
                     }
-                    i++;
                 }
+
+                renderer->disableScissoring();
+
+                this->m_offset += (this->m_nextOffset - this->m_offset) * 0.1F;
+                this->invalidate();
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
-                u16 y = this->getY();
-                u16 i = 0;
+                s32 y = this->getY() - this->m_offset;
+
+                this->m_listHeight = 0;
+                for (auto &entry : this->m_items)
+                    this->m_listHeight += entry->getHeight();
+
                 for (auto &entry : this->m_items) {
-                    if (i >= this->m_offset && i < this->m_offset + this->m_entriesShown) {
-                        entry.element->setBoundaries(this->getX(), y, this->getWidth(), entry.height);
-                        entry.element->invalidate();
-                        y += entry.height;
-                    }
-                    i++;
+                    entry->setBoundaries(this->getX(), y, this->getWidth(), entry->getHeight());
+                    entry->invalidate();
+                    y += entry->getHeight();
                 }
             }
 
@@ -2058,14 +2101,12 @@ namespace tsl {
              * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
              */
             virtual void addItem(Element *element, u16 height = 0) final {
-                if (height == 0) {
-                    if (dynamic_cast<ListItem*>(element) != nullptr)
-                        height = tsl::style::ListItemDefaultHeight;
-                }
+                if (element != nullptr) {
+                    if (height != 0)
+                        element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
 
-                if (element != nullptr && height > 0) {
                     element->setParent(this);
-                    this->m_items.push_back({ element, height });
+                    this->m_items.push_back(element);
                     this->invalidate();
                 }
 
@@ -2079,73 +2120,85 @@ namespace tsl {
              */
             virtual void clear() final {     
                 for (auto& item : this->m_items)
-                    delete item.element;
+                    delete item;
 
                 this->m_items.clear();
                 this->m_offset = 0;
-                this->m_focusedElement = 0;
+                this->m_focusedIndex = 0;
+            }
+
+            virtual void updateScrollOffset() {
+                
+                this->m_nextOffset = 0;
+                for (u16 i = 0; i < this->m_focusedIndex; i++)
+                    this->m_nextOffset += this->m_items[i]->getHeight();
+
+                this->m_nextOffset -= this->getHeight() / 4;
+                
+                if (this->m_nextOffset < 0)
+                    this->m_nextOffset = 0;
+
+                if (this->m_nextOffset > (this->m_listHeight - this->getHeight()) + 50)
+                    this->m_nextOffset = (this->m_listHeight - this->getHeight() + 50);
             }
 
             virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
-                if (this->m_items.size() == 0)
-                    return nullptr;
+                Element *newFocus = nullptr;
 
-                auto it = std::find(this->m_items.begin(), this->m_items.end(), oldFocus);
+                if (direction == FocusDirection::None) {
+                    for (u16 i = 0; i < this->m_items.size(); i++) {
+                        newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
 
-                if (it == this->m_items.end() || direction == FocusDirection::None)
-                    return this->m_items[0].element;
+                        if (newFocus != nullptr) {
+                            m_focusedIndex = i;
 
-                u16 oldFocusIdx = std::distance(this->m_items.begin(), it);
-
-                // number of spaces to have between top/bottom item and focused item while scrolling
-                // default 1, cannot exceed half of the number of entries shown
-                const int lead = std::min(1, (this->m_entriesShown - 1) / 2);
-
-                if (direction == FocusDirection::Up) {
-                    if (oldFocusIdx == 0)
-                        return this->m_items[0].element;
-                    else {
-                        // old focus on the leading item, and has items offscreen above
-                        if (oldFocusIdx == this->m_offset + lead) {
-                            if (this->m_offset > 0) {
-                                this->m_offset--;
-                                this->invalidate();
-                            }
+                            this->updateScrollOffset();
+                            return newFocus;
                         }
-                        return (it - 1)->element;
                     }
-                } else if (direction == FocusDirection::Down) {
-                    if (oldFocusIdx == this->m_items.size() - 1)
-                        return this->m_items[this->m_items.size() - 1].element;
-                    else {
-                        // old focus on the leading item, and has more items offscreen below
-                        if (oldFocusIdx == this->m_offset + (this->m_entriesShown - 1) - lead) {
-                            if (this->m_offset + this->m_entriesShown < this->m_items.size()) {
-                                this->m_offset++;
-                                this->invalidate();
+                } else {
+                    if (direction == FocusDirection::Down) {
+
+                        for (u16 i = this->m_focusedIndex + 1; i < this->m_items.size(); i++) {
+                            newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
+
+                            if (newFocus != nullptr && newFocus != oldFocus) {
+                                this->m_focusedIndex = i;
+
+                                this->updateScrollOffset();
+                                return newFocus;
                             }
                         }
-                        return (it + 1)->element;
+
+                        return oldFocus;
+                    } else if (direction == FocusDirection::Up) {
+                        if (this->m_focusedIndex > 0) {
+
+                            for (u16 i = this->m_focusedIndex - 1; i >= 0; i--) {
+                                newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
+                                
+                                if (newFocus != nullptr && newFocus != oldFocus) {
+                                    this->m_focusedIndex = i;
+                                    
+                                    this->updateScrollOffset();
+                                    return newFocus;
+                                }
+                            }
+                        }
+
+                        return oldFocus;
                     }
                 }
-                
-                return it->element;
+
+                return oldFocus;
             }
 
         protected:
-            struct ListEntry {
-                Element *element;
-                u16 height;
+            std::vector<Element*> m_items;
+            u16 m_focusedIndex = 0;
 
-                bool operator==(Element *other) {
-                    return this->element == other;
-                }
-            };
-
-            std::vector<ListEntry> m_items;
-            u16 m_focusedElement = 0;
-
-            u16 m_offset = 0;
+            float m_offset = 0, m_nextOffset = 0;
+            u32 m_listHeight = 0;
             u16 m_entriesShown = 5;
         };
 
@@ -2881,7 +2934,7 @@ namespace tsl {
         shData.running = true;
 
         Thread hidPollerThread, homeButtonDetectorThread, powerButtonDetectorThread;
-        threadCreate(&hidPollerThread, impl::hidInputPoller<launchFlags>, &shData, nullptr, 0x1000, 0x2C, -2);
+        threadCreate(&hidPollerThread, impl::hidInputPoller<launchFlags>, &shData, nullptr, 0x1000, 0x10, -2);
         threadCreate(&homeButtonDetectorThread, impl::homeButtonDetector, &shData, nullptr, 0x1000, 0x2C, -2);
         threadCreate(&powerButtonDetectorThread, impl::powerButtonDetector, &shData, nullptr, 0x1000, 0x2C, -2);
         threadStart(&hidPollerThread);
