@@ -1693,35 +1693,12 @@ namespace tsl {
             }
 
             /**
-             * @brief Adds a new item to the list
-             * @warning DO NOT use this to add new items after you created the list. Use \ref addItemPostponed instead!
+             * @brief Adds a new item to the list before the next frame starts
              * 
              * @param element Element to add
              * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
              */
             virtual void addItem(Element *element, u16 height = 0) final {
-                if (element != nullptr) {
-                    if (height != 0)
-                        element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
-
-                    element->setParent(this);
-                    element->invalidate();
-
-                    this->m_items.push_back(element);
-                    this->invalidate();
-
-                    this->requestFocus(nullptr, FocusDirection::None);
-                }
-
-            }   
-
-            /**
-             * @brief Adds a new item to the list before the next frame starts. This is useful for if you want to add new items to the list later on.
-             * 
-             * @param element Element to add
-             * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
-             */
-            virtual void addItemPostponed(Element *element, u16 height = 0) final {
                 if (element != nullptr) {
                     if (height != 0)
                         element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
