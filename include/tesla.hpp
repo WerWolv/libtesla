@@ -29,7 +29,6 @@
 #include <cstring>
 #include <cwctype>
 #include <string>
-#include <sstream>
 #include <functional>
 #include <type_traits>
 #include <mutex>
@@ -67,6 +66,7 @@
         }                               \
     })
 
+using namespace std::literals::string_literals;
 using namespace std::literals::chrono_literals;
 
 namespace tsl {
@@ -319,17 +319,17 @@ namespace tsl {
              * @return Ini string
              */
             static std::string unparseIni(IniData const &iniData) {
-                std::stringstream ss;
+                std::string string;
                 bool addSectionGap = false;
                 for (auto &section : iniData) {
                     if (addSectionGap)
-                        ss << "\n";
-                    ss << "[" << section.first << "]\n";
+                        string += "\n";
+                    string += "["s + section.first + "]\n"s;
                     for (auto &keyValue : section.second) {
-                        ss << keyValue.first << "=" << keyValue.second << "\n";
+                        string += keyValue.first + "="s + keyValue.second + "\n"s;
                     }
                 }
-                return ss.str();
+                return string;
             }
 
             /**
@@ -635,8 +635,8 @@ namespace tsl {
                             s16 y1 = centerY - y;
                             s16 x0 = i;
                             
-                            this->setPixel(x0, y0, color);
-                            this->setPixel(x0, y1, color);
+                            this->setPixelBlendDst(x0, y0, color);
+                            this->setPixelBlendDst(x0, y1, color);
                         }
                         
                         for (s16 i = centerX - y; i <= centerX + y; i++) {
@@ -644,8 +644,8 @@ namespace tsl {
                             s16 y1 = centerY - x;
                             s16 x0 = i;
 
-                            this->setPixel(x0, y0, color);
-                            this->setPixel(x0, y1, color);
+                            this->setPixelBlendDst(x0, y0, color);
+                            this->setPixelBlendDst(x0, y1, color);
                         }
 
                         y++;
@@ -657,14 +657,14 @@ namespace tsl {
                             xChange += 2;
                         }
                     } else {
-                        this->setPixel(centerX + x, centerY + y, color);
-                        this->setPixel(centerX + y, centerY + x, color);
-                        this->setPixel(centerX - y, centerY + x, color);
-                        this->setPixel(centerX - x, centerY + y, color);
-                        this->setPixel(centerX - x, centerY - y, color);
-                        this->setPixel(centerX - y, centerY - x, color);
-                        this->setPixel(centerX + y, centerY - x, color);
-                        this->setPixel(centerX + x, centerY - y, color);
+                        this->setPixelBlendDst(centerX + x, centerY + y, color);
+                        this->setPixelBlendDst(centerX + y, centerY + x, color);
+                        this->setPixelBlendDst(centerX - y, centerY + x, color);
+                        this->setPixelBlendDst(centerX - x, centerY + y, color);
+                        this->setPixelBlendDst(centerX - x, centerY - y, color);
+                        this->setPixelBlendDst(centerX - y, centerY - x, color);
+                        this->setPixelBlendDst(centerX + y, centerY - x, color);
+                        this->setPixelBlendDst(centerX + x, centerY - y, color);
                         
                         if(radiusError <= 0) {
                             y++;
@@ -1631,8 +1631,11 @@ namespace tsl {
 
                 renderer->disableScissoring();
 
+                float prevOffset = this->m_offset;
                 this->m_offset += (this->m_nextOffset - this->m_offset) * 0.1F;
-                this->invalidate();
+
+                if (static_cast<u32>(prevOffset) != static_cast<u32>(this->m_offset))
+                    this->invalidate();
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
@@ -1990,8 +1993,8 @@ namespace tsl {
             virtual ~CategoryHeader() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->drawRect(this->getX() - 2, this->getY() + this->getHeight() - 30, 5, 23, tsl::style::color::ColorHeaderBar);
-                renderer->drawString(this->m_text.c_str(), false, this->getX() + 13, this->getY() + this->getHeight() - 12, 15, tsl::style::color::ColorText);
+                renderer->drawRect(this->getX() - 2, this->getY() + this->getHeight() - 30, 5, 23, a(tsl::style::color::ColorHeaderBar));
+                renderer->drawString(this->m_text.c_str(), false, this->getX() + 13, this->getY() + this->getHeight() - 12, 15, a(tsl::style::color::ColorText));
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
@@ -2060,13 +2063,13 @@ namespace tsl {
                 renderer->drawString(this->m_icon, false, this->getX() + 15, this->getY() + 45, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
 
                 u16 handlePos = (this->getWidth() - 95) * static_cast<float>(this->m_value) / 100;
-                renderer->drawCircle(this->getX() + 60, this->getY() + 37, 2, true, tsl::style::color::ColorHighlight);
-                renderer->drawCircle(this->getX() + 60 + this->getWidth() - 95, this->getY() + 37, 2, true, tsl::style::color::ColorFrame);
-                renderer->drawRect(this->getX() + 60 + handlePos, this->getY() + 35, this->getWidth() - 95 - handlePos, 5, tsl::style::color::ColorFrame);
-                renderer->drawRect(this->getX() + 60, this->getY() + 35, handlePos, 5, tsl::style::color::ColorHighlight);
+                renderer->drawCircle(this->getX() + 60, this->getY() + 37, 2, true, a(tsl::style::color::ColorHighlight));
+                renderer->drawCircle(this->getX() + 60 + this->getWidth() - 95, this->getY() + 37, 2, true, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX() + 60 + handlePos, this->getY() + 35, this->getWidth() - 95 - handlePos, 5, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX() + 60, this->getY() + 35, handlePos, 5, a(tsl::style::color::ColorHighlight));
 
-                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 37, 18, true, tsl::style::color::ColorHandle);
-                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 37, 18, false, tsl::style::color::ColorFrame);
+                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 37, 18, true, a(tsl::style::color::ColorHandle));
+                renderer->drawCircle(this->getX() + 62 + handlePos, this->getY() + 37, 18, false, a(tsl::style::color::ColorFrame));
             }
 
             virtual void drawFocusBackground(gfx::Renderer *renderer) {
@@ -2205,13 +2208,13 @@ namespace tsl {
                 u16 stepWidth = trackBarWidth / (this->m_numSteps - 1);
 
                 for (u8 i = 0; i < this->m_numSteps; i++) {
-                    renderer->drawRect(this->getX() + 60 + stepWidth * i, this->getY() + 45, 1, 10, tsl::style::color::ColorFrame);
+                    renderer->drawRect(this->getX() + 60 + stepWidth * i, this->getY() + 45, 1, 10, a(tsl::style::color::ColorFrame));
                 }
 
                 u8 currentDescIndex = std::clamp(this->m_value / (100 / (this->m_numSteps - 1)), 0, this->m_numSteps - 1);
 
                 auto [descWidth, descHeight] = renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, 0, 0, 15, tsl::style::color::ColorTransparent);
-                renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, ((this->getX() + 60) + (this->getWidth() - 95) / 2) - (descWidth / 2), this->getY() + 20, 15, tsl::style::color::ColorDescription);
+                renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, ((this->getX() + 60) + (this->getWidth() - 95) / 2) - (descWidth / 2), this->getY() + 20, 15, a(tsl::style::color::ColorDescription));
 
                 TrackBar::draw(renderer);
             }
