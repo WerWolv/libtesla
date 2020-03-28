@@ -10,8 +10,8 @@ It's main goal is to make sure all overlays look and feel similar and don't diff
 ## Screenshots
 
 <div>
-    <img src="./resources/ovl_cheats.jpg" style="width: 50%; float: center">
-    <img src="./resources/ovl_stats.jpg" style="width: 50%; float: right">
+    <img src="https://i.imgur.com/jJpxYjb.jpg" style="width: 50%; float: center">
+    <img src="https://i.imgur.com/nBUc7ps.jpg" style="width: 50%; float: right">
 </div>
 
 `Or rather screen pictures. Overlays do NOT show up on Screenshots.`
