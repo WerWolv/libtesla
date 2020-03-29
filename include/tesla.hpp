@@ -2199,6 +2199,9 @@ namespace tsl {
             virtual ~TrackBar() {}
 
             virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
+                if (keysHeld & KEY_LEFT && keysHeld & KEY_RIGHT)
+                    return true;
+
                 if (keysHeld & KEY_LEFT) {
                     if (this->m_value > 0) {
                         this->m_value--;
@@ -2364,6 +2367,12 @@ namespace tsl {
 
             virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
                 static u32 tick = 0;
+
+                if (keysHeld & KEY_LEFT && keysHeld & KEY_RIGHT) {
+                    tick = 0;
+                    return true;
+                }
+
                 if (keysHeld & (KEY_LEFT | KEY_RIGHT)) {
                     if ((tick == 0 || tick > 20) && (tick % 3) == 0) {
                         if (keysHeld & KEY_LEFT && this->m_value > 0) {
