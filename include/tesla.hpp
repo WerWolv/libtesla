@@ -2357,30 +2357,28 @@ namespace tsl {
              * @param onValue Value drawn if the toggle is on
              * @param offValue Value drawn if the toggle is off
              */
-            StepTrackBar(const char icon[3], std::initializer_list<std::string> stepDescriptions) 
-                : TrackBar(icon), m_numSteps(stepDescriptions.size()), m_stepDescriptions(stepDescriptions.begin(), stepDescriptions.end()) { }
+            StepTrackBar(const char icon[3], size_t count)
+                : TrackBar(icon), m_numSteps(count) { }
 
             virtual ~StepTrackBar() {}
 
             virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
-                return false;
-            }
-
-            virtual bool onClick(u64 key) {
-                if (key & KEY_LEFT) {
-                    if (this->m_value > 0) {
-                        this->m_value = std::max(this->m_value - (100 / (this->m_numSteps - 1)), 0);
+                static u32 tick = 0;
+                if (keysHeld & (KEY_LEFT | KEY_RIGHT)) {
+                    if ((tick == 0 || tick > 20) && (tick % 3) == 0) {
+                        if (keysHeld & KEY_LEFT && this->m_value > 0) {
+                            this->m_value = std::max(this->m_value - (100 / (this->m_numSteps - 1)), 0);
+                        } else if (keysHeld & KEY_RIGHT && this->m_value < 100) {
+                            this->m_value = std::min(this->m_value + (100 / (this->m_numSteps - 1)), 100);
+                        } else {
+                            return false;
+                        }
                         this->m_valueChangedListener(this->getProgress());
-                        return true;
                     }
-                }
-
-                if (key & KEY_RIGHT) {
-                    if (this->m_value < 100) {
-                        this->m_value = std::min(this->m_value + (100 / (this->m_numSteps - 1)), 100);
-                        this->m_valueChangedListener(this->getProgress());
-                        return true;
-                    }
+                    tick++;
+                    return true;
+                } else {
+                    tick = 0;
                 }
 
                 return false;
@@ -2406,23 +2404,6 @@ namespace tsl {
                 return false;
             }
 
-            virtual void draw(gfx::Renderer *renderer) override {
-
-                u16 trackBarWidth = this->getWidth() - 95;
-                u16 stepWidth = trackBarWidth / (this->m_numSteps - 1);
-
-                for (u8 i = 0; i < this->m_numSteps; i++) {
-                    renderer->drawRect(this->getX() + 60 + stepWidth * i, this->getY() + 50, 1, 10, a(tsl::style::color::ColorFrame));
-                }
-
-                u8 currentDescIndex = std::clamp(this->m_value / (100 / (this->m_numSteps - 1)), 0, this->m_numSteps - 1);
-
-                auto [descWidth, descHeight] = renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, 0, 0, 15, tsl::style::color::ColorTransparent);
-                renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, ((this->getX() + 60) + (this->getWidth() - 95) / 2) - (descWidth / 2), this->getY() + 20, 15, a(tsl::style::color::ColorDescription));
-
-                TrackBar::draw(renderer);
-            }
-
             /**
              * @brief Gets the current value of the trackbar
              * 
@@ -2444,6 +2425,41 @@ namespace tsl {
 
         protected:
             u8 m_numSteps = 1;
+        };
+
+        class NamedStepTrackBar : public StepTrackBar {
+        public:
+            /**
+             * @brief Constructor
+             * 
+             * @param text Initial description text
+             * @param initialState Is the toggle set to On or Off initially
+             * @param onValue Value drawn if the toggle is on
+             * @param offValue Value drawn if the toggle is off
+             */
+            NamedStepTrackBar(const char icon[3], std::initializer_list<std::string> stepDescriptions) 
+                : StepTrackBar(icon, stepDescriptions.size()), m_stepDescriptions(stepDescriptions.begin(), stepDescriptions.end()) { }
+
+            virtual ~NamedStepTrackBar() {}
+
+            virtual void draw(gfx::Renderer *renderer) override {
+
+                u16 trackBarWidth = this->getWidth() - 95;
+                u16 stepWidth = trackBarWidth / (this->m_numSteps - 1);
+
+                for (u8 i = 0; i < this->m_numSteps; i++) {
+                    renderer->drawRect(this->getX() + 60 + stepWidth * i, this->getY() + 50, 1, 10, a(tsl::style::color::ColorFrame));
+                }
+
+                u8 currentDescIndex = std::clamp(this->m_value / (100 / (this->m_numSteps - 1)), 0, this->m_numSteps - 1);
+
+                auto [descWidth, descHeight] = renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, 0, 0, 15, tsl::style::color::ColorTransparent);
+                renderer->drawString(this->m_stepDescriptions[currentDescIndex].c_str(), false, ((this->getX() + 60) + (this->getWidth() - 95) / 2) - (descWidth / 2), this->getY() + 20, 15, a(tsl::style::color::ColorDescription));
+
+                StepTrackBar::draw(renderer);
+            }
+
+        protected:
             std::vector<std::string> m_stepDescriptions;
         };
 
@@ -3156,7 +3172,7 @@ namespace tsl {
                 }
 
                 //20 ms
-                svcSleepThread(20E6);
+                svcSleepThread(20'000'000ul);
             }
         }
 
