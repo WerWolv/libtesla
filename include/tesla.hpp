@@ -103,6 +103,7 @@ namespace tsl {
             constexpr u16 ColorText             = 0xFFFF;   ///< Standard text color
             constexpr u16 ColorDescription      = 0xFAAA;   ///< Description text color
             constexpr u16 ColorHeaderBar        = 0xFCCC;   ///< Category header rectangle color
+            constexpr u16 ColorClickAnimation   = 0xF220;
         }
     }
 
@@ -600,7 +601,7 @@ namespace tsl {
                 end.r = this->blendColor(src.r, dst.r, dst.a);
                 end.g = this->blendColor(src.g, dst.g, dst.a);
                 end.b = this->blendColor(src.b, dst.b, dst.a);
-                end.a = 0xF;
+                end.a = src.a;
 
                 this->setPixel(x, y, end);
             }
@@ -628,7 +629,7 @@ namespace tsl {
                 end.r = this->blendColor(src.r, dst.r, dst.a);
                 end.g = this->blendColor(src.g, dst.g, dst.a);
                 end.b = this->blendColor(src.b, dst.b, dst.a);
-                end.a = 0xF;
+                end.a = std::min(dst.a + src.a, 0xF);
 
                 this->setPixel(x, y, end);
             }
@@ -1060,7 +1061,7 @@ namespace tsl {
                     for (s32 bmpX = 0; bmpX < width; bmpX++) {
                         Color tmpColor = color;
                         tmpColor.a = (glyphBmp[width * bmpY + bmpX] >> 4) * (float(tmpColor.a) / 0xF);
-                        this->setPixelBlendSrc(x + bmpX, y + bmpY, tmpColor);
+                        this->setPixelBlendDst(x + bmpX, y + bmpY, tmpColor);
                     }
                 }
 
@@ -1165,8 +1166,12 @@ namespace tsl {
              * @param renderer 
              */
             virtual void frame(gfx::Renderer *renderer) final {
+                renderer->enableScissoring(0, 0, tsl::cfg::FramebufferWidth, tsl::cfg::FramebufferHeight);
+
                 if (this->m_focused)
                     this->drawFocusBackground(renderer);
+
+                renderer->disableScissoring();
 
                 this->draw(renderer);
 
@@ -1217,9 +1222,13 @@ namespace tsl {
              * @param renderer Renderer
              */
             virtual void drawClickAnimation(gfx::Renderer *renderer) {
+                gfx::Color animColor = tsl::style::color::ColorClickAnimation;
                 u8 saturation = tsl::style::ListItemHighlightSaturation * (float(this->m_clickAnimationProgress) / float(tsl::style::ListItemHighlightLength));
 
-                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a({0x0, saturation, saturation, 0xf}));
+                animColor.g = saturation;
+                animColor.b = saturation;
+
+                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a(animColor));
             }
             
             /**
@@ -1288,6 +1297,7 @@ namespace tsl {
                 renderer->drawRect(this->m_x + x - 4, this->m_y + y + this->m_height, this->m_width + 8, 4, a(highlightColor));
                 renderer->drawRect(this->m_x + x - 4, this->m_y + y, 4, this->m_height, a(highlightColor));
                 renderer->drawRect(this->m_x + x + this->m_width, this->m_y + y, 4, this->m_height, a(highlightColor));
+
             }
 
             /**
@@ -1455,7 +1465,7 @@ namespace tsl {
                 renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
                 renderer->drawRect(tsl::cfg::FramebufferWidth - 1, 0, 1, tsl::cfg::FramebufferHeight, a(0xF222));
 
-                renderer->drawString(std::to_string((int)Element::getInputMode()).c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
+                renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
                 renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorDescription));
 
                 renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
@@ -1546,6 +1556,7 @@ namespace tsl {
 
             virtual void draw(gfx::Renderer *renderer) override {
                 renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
+                renderer->drawRect(tsl::cfg::FramebufferWidth - 1, 0, 1, tsl::cfg::FramebufferHeight, a(0xF222));
 
                 renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
 
@@ -1902,7 +1913,7 @@ namespace tsl {
 
             virtual void draw(gfx::Renderer *renderer) override {
                 if (this->m_touched && Element::getInputMode() == InputMode::Touch) {
-                    renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a(0x5DF0));
+                    renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a(tsl::style::color::ColorClickAnimation));
                     this->m_touched = false;
                 }
 
@@ -2504,8 +2515,12 @@ namespace tsl {
          * @param element Element to remove focus from. Pass nullptr to remove the focus unconditionally
          */
         virtual void removeFocus(elm::Element* element = nullptr) final {
-            if (element == nullptr || element == this->m_focusedElement)
-                this->m_focusedElement = nullptr;
+            if (element == nullptr || element == this->m_focusedElement) {
+                if (this->m_focusedElement != nullptr) {
+                    this->m_focusedElement->setFocused(false);
+                    this->m_focusedElement = nullptr;
+                }
+            }
         }
 
     protected:
@@ -2514,6 +2529,8 @@ namespace tsl {
     private:
         elm::Element *m_focusedElement = nullptr;
         elm::Element *m_topElement = nullptr;
+
+        bool m_initialFocusSet = false;
 
         friend class Overlay;
         friend class gfx::Renderer;
@@ -2524,11 +2541,16 @@ namespace tsl {
          * @param renderer 
          */
         virtual void draw(gfx::Renderer *renderer) final {
-            if (this->getFocusedElement() == nullptr && this->getTopElement() != nullptr)
-                this->requestFocus(this->getTopElement(), tsl::FocusDirection::None);
-
             if (this->m_topElement != nullptr)
                 this->m_topElement->draw(renderer);
+        }
+
+        virtual bool initialFocusSet() final {
+            return this->m_initialFocusSet;
+        }
+
+        virtual void markInitialFocusSet() final {
+            this->m_initialFocusSet = true;
         }
     };
 
@@ -2778,15 +2800,26 @@ namespace tsl {
             static bool oldTouchDetected = false;
             
             auto& currentGui = this->getCurrentGui();
+
+            if (currentGui == nullptr)
+                return;
+
             auto currentFocus = currentGui->getFocusedElement();
             auto topElement = currentGui->getTopElement();
 
             if (currentFocus == nullptr) {
-                if (topElement == nullptr) {
-                    if (keysDown & KEY_B) 
-                        this->goBack();
-
+                if (keysDown & KEY_B) {
+                    this->goBack();
                     return;
+                }
+
+                if (topElement == nullptr)
+                    return;
+                else if (currentGui != nullptr) {
+                    if (!currentGui->initialFocusSet() || keysDown & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT)) {
+                        currentGui->requestFocus(topElement, FocusDirection::None);
+                        currentGui->markInitialFocusSet();
+                    }
                 }
             }
 
@@ -2809,7 +2842,7 @@ namespace tsl {
 
             handled = handled | currentGui->handleInput(keysDown, keysHeld, touchPos, joyStickPosLeft, joyStickPosRight);
 
-            if (!handled) {
+            if (!handled && currentFocus != nullptr) {
                 if (keysDown & KEY_UP)
                     currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Up);
                 else if (keysDown & KEY_DOWN)
@@ -2836,6 +2869,7 @@ namespace tsl {
 
                 if ((xDistance + yDistance) > 1000) {
                     elm::Element::setInputMode(InputMode::TouchScroll);
+                    currentGui->removeFocus();
                 }
 
                 if (currentGui != nullptr && topElement != nullptr)
@@ -2843,9 +2877,14 @@ namespace tsl {
 
                 oldTouchPos = touchPos;
 
-                if (touchPos.px >= cfg::FramebufferWidth)
-                    if (tsl::elm::Element::getInputMode() == tsl::InputMode::Touch)
+                if (touchPos.px >= cfg::FramebufferWidth) {
+                    if (tsl::elm::Element::getInputMode() == tsl::InputMode::Touch) {
+                        oldTouchPos = { 0 };
+                        initialTouchPos = { 0 };
+
                         this->hide();
+                    }
+                }
             } else {
                 elm::Element::setInputMode(InputMode::Controller);
 
@@ -2893,7 +2932,6 @@ namespace tsl {
          */
         std::unique_ptr<tsl::Gui>& changeTo(std::unique_ptr<tsl::Gui>&& gui) {
             gui->m_topElement = gui->createUI();
-            gui->requestFocus(gui->m_topElement, FocusDirection::None);
 
             this->m_guiStack.push(std::move(gui));
 
@@ -3218,6 +3256,7 @@ namespace tsl {
 
             overlay->show();
             overlay->clearScreen();
+            
 
             while (shData.running) {
                 overlay->loop();
