@@ -1076,6 +1076,13 @@ namespace tsl {
 
     namespace elm {
         
+        enum class TouchEvent {
+            Touch,
+            Hold,
+            Scroll,
+            Release
+        };
+
         /**
          * @brief The top level Element of the libtesla UI library
          * @note When creating your own elements, extend from this or one of it's sub classes
@@ -1136,7 +1143,7 @@ namespace tsl {
              * @return true when touch input has been consumed
              * @return false when touch input should be passed on to the parent
              */
-            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
+            virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
                 return false;
             }
 
@@ -1492,9 +1499,9 @@ namespace tsl {
                     return nullptr;
             }
 
-            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
+            virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
                 if (this->m_contentElement != nullptr)
-                    return this->m_contentElement->onTouch(currX, currY, prevX, prevY, initialX, initialY);
+                    return this->m_contentElement->onTouch(event, currX, currY, prevX, prevY, initialX, initialY);
                 else return false;
             }
 
@@ -1737,16 +1744,16 @@ namespace tsl {
                 }
             }
 
-            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
+            virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
                 bool handled = false;
 
                 for (auto &item : this->m_items)
-                    handled |= item->onTouch(currX, currY, prevX, prevY, initialX, initialY);
+                    handled |= item->onTouch(event, currX, currY, prevX, prevY, initialX, initialY);
 
                 if (handled)
                     return true;
 
-                if (Element::getInputMode() == InputMode::TouchScroll) {
+                if (event != TouchEvent::Release && Element::getInputMode() == InputMode::TouchScroll) {
                     if (prevX != 0 && prevY != 0)
                         this->m_nextOffset += (prevY - currY);
 
@@ -1796,7 +1803,17 @@ namespace tsl {
                     return nullptr;
 
                 if (direction == FocusDirection::None) {
-                    for (u16 i = 0; i < this->m_items.size(); i++) {
+                    u16 i = 0;
+                    
+                    if (oldFocus == nullptr) {
+                        s32 elementHeight = 0;
+                        while (elementHeight < this->m_offset && i < this->m_items.size()) {
+                            i++;
+                            elementHeight += this->m_items[i]->getHeight();
+                        }
+                    }
+
+                    for (; i < this->m_items.size(); i++) {
                         newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
 
                         if (newFocus != nullptr) {
@@ -1874,6 +1891,9 @@ namespace tsl {
         private:
 
             virtual void updateScrollOffset() {
+                if (this->getInputMode() != InputMode::Controller)
+                    return;
+
                 if (this->m_listHeight <= this->getHeight()) {
                     this->m_nextOffset = 0;
                     this->m_offset = 0;
@@ -1983,13 +2003,20 @@ namespace tsl {
             }
 
 
-            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
-                if (prevX == 0 && prevY == 0) {
+            virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
+                this->m_touched = currX > this->getX() && currX < (this->getX() + this->getWidth()) && currY > this->getY() && currY < (this->getY() + this->getHeight());
+                
+                if (event == TouchEvent::Release && this->m_touched) {
                     this->m_touched = false;
-                    return false;
+
+                    if (Element::getInputMode() == InputMode::Touch) {
+                        bool handled = this->onClick(KEY_A);
+
+                        this->m_clickAnimationProgress = 0;
+                        return handled;
+                    }
                 }
 
-                this->m_touched = currX > this->getX() && currX < (this->getX() + this->getWidth()) && currY > this->getY() && currY < (this->getY() + this->getHeight());
                     
                 return false;
             }
@@ -2191,9 +2218,9 @@ namespace tsl {
                 return false;
             }
 
-            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
+            virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
                 if (initialX > this->getX() && initialX < (this->getX() + this->getWidth()) && initialY > this->getY() && initialY < (this->getY() + this->getHeight())) {
-                    if (currY > this->getY() && currY < (this->getY() + this->getHeight())) {
+                    if (currX > 0 && currX < (this->getX() + this->getWidth()) && currY > this->getY() && currY < (this->getY() + this->getHeight())) {
                         this->m_value = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
 
                         if (this->m_value < 0)
@@ -2311,7 +2338,7 @@ namespace tsl {
 
         protected:
             const char *m_icon = nullptr;
-            s8 m_value = 0;
+            s16 m_value = 0;
 
             std::function<void(u8)> m_valueChangedListener = [](u8){};
 
@@ -2359,7 +2386,7 @@ namespace tsl {
                 return false;
             }
 
-            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
+            virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
                 if (initialX > this->getX() && initialX < (this->getX() + this->getWidth()) && initialY > this->getY() && initialY < (this->getY() + this->getHeight())) {
                     if (currY > this->getY() && currY < (this->getY() + this->getHeight())) {
                         this->m_value = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
@@ -2523,6 +2550,10 @@ namespace tsl {
             }
         }
 
+        virtual void restoreFocus() final {
+            this->m_initialFocusSet = false;
+        }
+
     protected:
         constexpr static inline auto a = &gfx::Renderer::a;
 
@@ -2552,6 +2583,7 @@ namespace tsl {
         virtual void markInitialFocusSet() final {
             this->m_initialFocusSet = true;
         }
+
     };
 
 
@@ -2633,6 +2665,9 @@ namespace tsl {
             }
 
             this->onShow();
+
+            if (auto& currGui = this->getCurrentGui(); currGui != nullptr)
+                currGui->restoreFocus();
         }
 
         /**
@@ -2798,6 +2833,7 @@ namespace tsl {
             static touchPosition initialTouchPos = { 0 };
             static touchPosition oldTouchPos = { 0 };
             static bool oldTouchDetected = false;
+            static elm::TouchEvent touchEvent;
             
             auto& currentGui = this->getCurrentGui();
 
@@ -2854,11 +2890,18 @@ namespace tsl {
                 else if (keysDown & KEY_B) 
                     this->goBack();
             }
+
+            if (!touchDetected && oldTouchDetected) {
+                if (currentGui != nullptr && topElement != nullptr)
+                    topElement->onTouch(elm::TouchEvent::Release, oldTouchPos.px, oldTouchPos.py, oldTouchPos.px, oldTouchPos.py, initialTouchPos.px, initialTouchPos.py);
+            }
             
             if (touchDetected) {
                 if (!oldTouchDetected) {
                     initialTouchPos = touchPos;
                     elm::Element::setInputMode(InputMode::Touch);
+                    currentGui->removeFocus();
+                    touchEvent = elm::TouchEvent::Touch;
                 }
 
                 u32 xDistance = std::abs(static_cast<s32>(initialTouchPos.px) - static_cast<s32>(touchPos.px));
@@ -2869,11 +2912,15 @@ namespace tsl {
 
                 if ((xDistance + yDistance) > 1000) {
                     elm::Element::setInputMode(InputMode::TouchScroll);
-                    currentGui->removeFocus();
+                    touchEvent = elm::TouchEvent::Scroll;
+                } else {
+                    if (touchEvent != elm::TouchEvent::Scroll)
+                        touchEvent = elm::TouchEvent::Hold;
                 }
+                
 
                 if (currentGui != nullptr && topElement != nullptr)
-                    topElement->onTouch(touchPos.px, touchPos.py, oldTouchPos.px, oldTouchPos.py, initialTouchPos.px, initialTouchPos.py);
+                    topElement->onTouch(touchEvent, touchPos.px, touchPos.py, oldTouchPos.px, oldTouchPos.py, initialTouchPos.px, initialTouchPos.py);
 
                 oldTouchPos = touchPos;
 
