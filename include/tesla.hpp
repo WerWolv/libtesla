@@ -2921,11 +2921,9 @@ namespace tsl {
                         shouldShake = currentGui->getFocusedElement() != currentFocus;
                     }
                     tick++;
-                } else if (keysDown & KEY_B) {
-                    this->goBack();
-                    tick = 0;
-                    shouldShake = true;
                 } else {
+                    if (keysDown & KEY_B)
+                        this->goBack();
                     tick = 0;
                     shouldShake = true;
                 }
