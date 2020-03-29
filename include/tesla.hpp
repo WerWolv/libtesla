@@ -2905,24 +2905,29 @@ namespace tsl {
 
             if (!handled && currentFocus != nullptr) {
                 static u32 tick = 0;
+                static bool shouldShake = true;
 
                 if ((((keysHeld & KEY_UP) != 0) + ((keysHeld & KEY_DOWN) != 0) + ((keysHeld & KEY_LEFT) != 0) + ((keysHeld & KEY_RIGHT) != 0)) == 1) {
                     if ((tick == 0 || tick > 20) && (tick % 4) == 0) {
                         if (keysHeld & KEY_UP)
-                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Up, tick == 0);
+                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Up, shouldShake);
                         else if (keysHeld & KEY_DOWN)
-                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Down, tick == 0);
+                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Down, shouldShake);
                         else if (keysHeld & KEY_LEFT)
-                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Left, tick == 0);
+                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Left, shouldShake);
                         else if (keysHeld & KEY_RIGHT)
-                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Right, tick == 0);
+                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Right, shouldShake);
+
+                        shouldShake = currentGui->getFocusedElement() != currentFocus;
                     }
                     tick++;
                 } else if (keysDown & KEY_B) {
                     this->goBack();
                     tick = 0;
+                    shouldShake = true;
                 } else {
                     tick = 0;
+                    shouldShake = true;
                 }
             }
 
