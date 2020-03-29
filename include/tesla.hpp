@@ -2543,7 +2543,7 @@ namespace tsl {
          * @param element Element to focus
          * @param direction Focus direction
          */
-        virtual void requestFocus(elm::Element *element, FocusDirection direction) final {
+        virtual void requestFocus(elm::Element *element, FocusDirection direction, bool shake = true) final {
             elm::Element *oldFocus = this->m_focusedElement;
 
             if (element != nullptr) {
@@ -2557,7 +2557,7 @@ namespace tsl {
                 }
             }
 
-            if (oldFocus == this->m_focusedElement && this->m_focusedElement != nullptr)
+            if (shake && oldFocus == this->m_focusedElement && this->m_focusedElement != nullptr)
                 this->m_focusedElement->shakeHighlight(direction);
         }
 
@@ -2904,16 +2904,26 @@ namespace tsl {
             handled = handled | currentGui->handleInput(keysDown, keysHeld, touchPos, joyStickPosLeft, joyStickPosRight);
 
             if (!handled && currentFocus != nullptr) {
-                if (keysDown & KEY_UP)
-                    currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Up);
-                else if (keysDown & KEY_DOWN)
-                    currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Down);
-                else if (keysDown & KEY_LEFT)
-                    currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Left);
-                else if (keysDown & KEY_RIGHT)
-                    currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Right);
-                else if (keysDown & KEY_B) 
+                static u32 tick = 0;
+
+                if ((((keysHeld & KEY_UP) != 0) + ((keysHeld & KEY_DOWN) != 0) + ((keysHeld & KEY_LEFT) != 0) + ((keysHeld & KEY_RIGHT) != 0)) == 1) {
+                    if ((tick == 0 || tick > 20) && (tick % 4) == 0) {
+                        if (keysHeld & KEY_UP)
+                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Up, tick == 0);
+                        else if (keysHeld & KEY_DOWN)
+                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Down, tick == 0);
+                        else if (keysHeld & KEY_LEFT)
+                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Left, tick == 0);
+                        else if (keysHeld & KEY_RIGHT)
+                            currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Right, tick == 0);
+                    }
+                    tick++;
+                } else if (keysDown & KEY_B) {
                     this->goBack();
+                    tick = 0;
+                } else {
+                    tick = 0;
+                }
             }
 
             if (!touchDetected && oldTouchDetected) {
