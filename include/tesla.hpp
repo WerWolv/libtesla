@@ -131,12 +131,6 @@ namespace tsl {
     namespace elm { class Element; }
 
     namespace impl { 
-
-        extern std::vector<tsl::elm::Element*> g_deletedElements;
-
-        static inline void reportDeletedElement(tsl::elm::Element *element) {
-            tsl::impl::g_deletedElements.push_back(element);
-        } 
         
         /**
          * @brief Overlay launch parameters
@@ -758,7 +752,6 @@ namespace tsl {
                 s32 maxX = x;
                 s32 currX = x;
                 s32 currY = y;
-                u32 prevCharacter = 0;
 
                 u32 i = 0;
 
@@ -785,7 +778,6 @@ namespace tsl {
                         currFont = &this->m_stdFont;
 
                     float currFontSize = stbtt_ScaleForPixelHeight(currFont, fontSize);
-                    currX += currFontSize * stbtt_GetCodepointKernAdvance(currFont, prevCharacter, currCharacter);
 
                     int bounds[4] = { 0 };
                     stbtt_GetCodepointBitmapBoxSubpixel(currFont, currCharacter, currFontSize, currFontSize,
@@ -1090,9 +1082,7 @@ namespace tsl {
         class Element {
         public:
             Element() {}
-            virtual ~Element() {
-                tsl::impl::reportDeletedElement(this);
-            }
+            virtual ~Element() { }
 
             /**
              * @brief Handles focus requesting
@@ -1807,7 +1797,7 @@ namespace tsl {
                     
                     if (oldFocus == nullptr) {
                         s32 elementHeight = 0;
-                        while (elementHeight < this->m_offset && i < this->m_items.size()) {
+                        while (elementHeight < this->m_offset && i < this->m_items.size() - 1) {
                             i++;
                             elementHeight += this->m_items[i]->getHeight();
                         }
@@ -1817,7 +1807,7 @@ namespace tsl {
                         newFocus = this->m_items[i]->requestFocus(oldFocus, direction);
 
                         if (newFocus != nullptr) {
-                            m_focusedIndex = i;
+                            this->m_focusedIndex = i;
 
                             this->updateScrollOffset();
                             return newFocus;
@@ -2809,9 +2799,6 @@ namespace tsl {
 
             renderer.startFrame();
 
-            for (auto &deletedElement : tsl::impl::g_deletedElements)
-                this->getCurrentGui()->removeFocus(deletedElement);
-
             this->animationLoop();
             this->getCurrentGui()->update();
             this->getCurrentGui()->draw(&renderer);
@@ -3365,10 +3352,6 @@ namespace tsl::cfg {
     u16 FramebufferWidth  = 0;
     u16 FramebufferHeight = 0;
     u64 launchCombo = KEY_L | KEY_DDOWN | KEY_RSTICK;
-}
-
-namespace tsl::impl {
-    std::vector<tsl::elm::Element*> g_deletedElements;
 }
 
 extern "C" {
