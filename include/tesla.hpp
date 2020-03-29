@@ -2360,8 +2360,8 @@ namespace tsl {
              * @param onValue Value drawn if the toggle is on
              * @param offValue Value drawn if the toggle is off
              */
-            StepTrackBar(const char icon[3], size_t count)
-                : TrackBar(icon), m_numSteps(count) { }
+            StepTrackBar(const char icon[3], size_t numSteps)
+                : TrackBar(icon), m_numSteps(numSteps) { }
 
             virtual ~StepTrackBar() {}
 
