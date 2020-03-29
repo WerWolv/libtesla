@@ -120,6 +120,12 @@ namespace tsl {
         Right                       ///< Focus moved from right to left
     };
 
+    enum class InputMode {
+        Controller,
+        Touch,
+        TouchScroll
+    };
+
     class Overlay;
     namespace elm { class Element; }
 
@@ -1129,7 +1135,7 @@ namespace tsl {
              * @return true when touch input has been consumed
              * @return false when touch input should be passed on to the parent
              */
-            virtual bool onTouch(u32 x, u32 y) {
+            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
                 return false;
             }
 
@@ -1355,6 +1361,11 @@ namespace tsl {
              */
             virtual inline void setFocused(bool focused) { this->m_focused = focused; }
 
+
+            static InputMode getInputMode() { return Element::s_inputMode; }
+
+            static void setInputMode(InputMode mode) { Element::s_inputMode = mode; }
+
         protected:
             constexpr static inline auto a = &gfx::Renderer::a;
             bool m_focused = false;
@@ -1364,6 +1375,8 @@ namespace tsl {
             bool m_highlightShaking = false;
             std::chrono::system_clock::time_point m_highlightShakingStartTime;
             FocusDirection m_highlightShakingDirection;
+
+            static inline InputMode s_inputMode;
 
             /**
              * @brief Shake animation callculation based on a damped sine wave
@@ -1442,7 +1455,7 @@ namespace tsl {
                 renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
                 renderer->drawRect(tsl::cfg::FramebufferWidth - 1, 0, 1, tsl::cfg::FramebufferHeight, a(0xF222));
 
-                renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
+                renderer->drawString(std::to_string((int)Element::getInputMode()).c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
                 renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorDescription));
 
                 renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
@@ -1467,6 +1480,12 @@ namespace tsl {
                     return this->m_contentElement->requestFocus(oldFocus, direction);
                 else
                     return nullptr;
+            }
+
+            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
+                if (this->m_contentElement != nullptr)
+                    return this->m_contentElement->onTouch(currX, currY, prevX, prevY, initialX, initialY);
+                else return false;
             }
 
             /**
@@ -1681,7 +1700,11 @@ namespace tsl {
                     renderer->drawCircle(this->getX() + this->getWidth() + 12, this->getY() + scrollbarOffset + scrollbarHeight - 50, 2, true, a(tsl::style::color::ColorHandle));
                     
                     float prevOffset = this->m_offset;
-                    this->m_offset += ((this->m_nextOffset) - this->m_offset) * 0.1F;
+
+                    if (Element::getInputMode() == InputMode::Controller)
+                        this->m_offset += ((this->m_nextOffset) - this->m_offset) * 0.1F;
+                    else if (Element::getInputMode() == InputMode::TouchScroll)
+                        this->m_offset += ((this->m_nextOffset) - this->m_offset);
 
                     if (static_cast<u32>(prevOffset) != static_cast<u32>(this->m_offset))
                         this->invalidate();
@@ -1701,6 +1724,31 @@ namespace tsl {
                     entry->invalidate();
                     y += entry->getHeight();
                 }
+            }
+
+            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
+                bool handled = false;
+
+                for (auto &item : this->m_items)
+                    handled |= item->onTouch(currX, currY, prevX, prevY, initialX, initialY);
+
+                if (handled)
+                    return true;
+
+                if (Element::getInputMode() == InputMode::TouchScroll) {
+                    if (prevX != 0 && prevY != 0)
+                        this->m_nextOffset += (prevY - currY);
+
+                    if (this->m_nextOffset < 0)
+                        this->m_nextOffset = 0;
+
+                    if (this->m_nextOffset > (this->m_listHeight - this->getHeight()) + 50)
+                        this->m_nextOffset = (this->m_listHeight - this->getHeight() + 50);
+
+                    return true;
+                }
+
+                return false;
             }
 
             /**
@@ -1853,6 +1901,11 @@ namespace tsl {
             virtual ~ListItem() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
+                if (this->m_touched && Element::getInputMode() == InputMode::Touch) {
+                    renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a(0x5DF0));
+                    this->m_touched = false;
+                }
+
                 if (this->m_maxWidth == 0) {
                     if (this->m_value.length() > 0) {
                         auto [valueWidth, valueHeight] = renderer->drawString(this->m_value.c_str(), false, 0, 0, 20, tsl::style::color::ColorTransparent);
@@ -1909,7 +1962,7 @@ namespace tsl {
                 this->setBoundaries(this->getX(), this->getY(), this->getWidth(), tsl::style::ListItemDefaultHeight);
             }
 
-            virtual bool onClick(u64 keys) {
+            virtual bool onClick(u64 keys) override {
                 if (keys & KEY_A)
                     this->triggerClickAnimation();
                 else if (keys & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT))
@@ -1917,6 +1970,19 @@ namespace tsl {
 
                 return Element::onClick(keys);
             }
+
+
+            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
+                if (prevX == 0 && prevY == 0) {
+                    this->m_touched = false;
+                    return false;
+                }
+
+                this->m_touched = currX > this->getX() && currX < (this->getX() + this->getWidth()) && currY > this->getY() && currY < (this->getY() + this->getHeight());
+                    
+                return false;
+            }
+            
 
             virtual void setFocused(bool state) override {
                 this->m_scroll = false;
@@ -1962,6 +2028,8 @@ namespace tsl {
             bool m_scroll = false;
             bool m_trunctuated = false;
             bool m_faint = false;
+
+            bool m_touched = false;
 
             u16 m_maxScroll = 0;
             u16 m_scrollOffset = 0;
@@ -2112,6 +2180,24 @@ namespace tsl {
                 return false;
             }
 
+            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
+                if (initialX > this->getX() && initialX < (this->getX() + this->getWidth()) && initialY > this->getY() && initialY < (this->getY() + this->getHeight())) {
+                    if (currY > this->getY() && currY < (this->getY() + this->getHeight())) {
+                        this->m_value = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
+
+                        if (this->m_value < 0)
+                            this->m_value = 0;
+
+                        if (this->m_value > 100)
+                            this->m_value = 100;
+
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
             virtual void draw(gfx::Renderer *renderer) override {
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
                 renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
@@ -2214,7 +2300,7 @@ namespace tsl {
 
         protected:
             const char *m_icon = nullptr;
-            u8 m_value = 0;
+            s8 m_value = 0;
 
             std::function<void(u8)> m_valueChangedListener = [](u8){};
 
@@ -2255,6 +2341,26 @@ namespace tsl {
                     if (this->m_value < 100) {
                         this->m_value = std::min(this->m_value + (100 / (this->m_numSteps - 1)), 100);
                         this->m_valueChangedListener(this->getProgress());
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            virtual bool onTouch(s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
+                if (initialX > this->getX() && initialX < (this->getX() + this->getWidth()) && initialY > this->getY() && initialY < (this->getY() + this->getHeight())) {
+                    if (currY > this->getY() && currY < (this->getY() + this->getHeight())) {
+                        this->m_value = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
+
+                        if (this->m_value < 0)
+                            this->m_value = 0;
+
+                        if (this->m_value > 100)
+                            this->m_value = 100;
+
+                        this->m_value = std::round(this->m_value / (100.0F / (this->m_numSteps - 1))) * (100.0F / (this->m_numSteps - 1));
+
                         return true;
                     }
                 }
@@ -2666,22 +2772,23 @@ namespace tsl {
          * @param rightJoyStick Right joystick position
          * @return Weather or not the input has been consumed
          */
-        virtual void handleInput(u64 keysDown, u64 keysHeld, touchPosition touchPos, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight) final {
+        virtual void handleInput(u64 keysDown, u64 keysHeld, bool touchDetected, touchPosition touchPos, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight) final {
+            static touchPosition initialTouchPos = { 0 };
+            static touchPosition oldTouchPos = { 0 };
+            static bool oldTouchDetected = false;
+            
             auto& currentGui = this->getCurrentGui();
             auto currentFocus = currentGui->getFocusedElement();
+            auto topElement = currentGui->getTopElement();
 
             if (currentFocus == nullptr) {
-                if (elm::Element* topElement = currentGui->getTopElement(); topElement == nullptr) {
+                if (topElement == nullptr) {
                     if (keysDown & KEY_B) 
                         this->goBack();
 
                     return;
                 }
-                else {
-                    currentFocus = topElement->requestFocus(nullptr, tsl::FocusDirection::None);
-                }
             }
-
 
             bool handled = false;
             elm::Element *parentElement = currentFocus;
@@ -2692,10 +2799,10 @@ namespace tsl {
             }
 
             parentElement = currentFocus;
-            do {
+            while (!handled && parentElement != nullptr) {
                 handled = parentElement->handleInput(keysDown, keysHeld, touchPos, joyStickPosLeft, joyStickPosRight);
                 parentElement = parentElement->getParent();
-            } while (!handled && parentElement != nullptr);
+            }
 
             if (currentGui != this->getCurrentGui())
                 return;
@@ -2714,6 +2821,39 @@ namespace tsl {
                 else if (keysDown & KEY_B) 
                     this->goBack();
             }
+            
+            if (touchDetected) {
+                if (!oldTouchDetected) {
+                    initialTouchPos = touchPos;
+                    elm::Element::setInputMode(InputMode::Touch);
+                }
+
+                u32 xDistance = std::abs(static_cast<s32>(initialTouchPos.px) - static_cast<s32>(touchPos.px));
+                u32 yDistance = std::abs(static_cast<s32>(initialTouchPos.py) - static_cast<s32>(touchPos.py));
+
+                xDistance *= xDistance;
+                yDistance *= yDistance;
+
+                if ((xDistance + yDistance) > 1000) {
+                    elm::Element::setInputMode(InputMode::TouchScroll);
+                }
+
+                if (currentGui != nullptr && topElement != nullptr)
+                    topElement->onTouch(touchPos.px, touchPos.py, oldTouchPos.px, oldTouchPos.py, initialTouchPos.px, initialTouchPos.py);
+
+                oldTouchPos = touchPos;
+
+                if (touchPos.px >= cfg::FramebufferWidth)
+                    if (tsl::elm::Element::getInputMode() == tsl::InputMode::Touch)
+                        this->hide();
+            } else {
+                elm::Element::setInputMode(InputMode::Controller);
+
+                oldTouchPos = { 0 };
+                initialTouchPos = { 0 };
+            }
+
+            oldTouchDetected = touchDetected;
         }
 
         /**
@@ -2820,6 +2960,7 @@ namespace tsl {
             u64 keysDownPending = 0;
             u64 keysHeld = 0;
             touchPosition touchPos = { 0 };
+            u32 touchCount = 0;
             JoystickPosition joyStickPosLeft = { 0 }, joyStickPosRight = { 0 };
         };
 
@@ -2911,7 +3052,8 @@ namespace tsl {
                     }
 
                     // Read in touch positions
-                    if (hidTouchCount() > 0)
+                    shData->touchCount = hidTouchCount();
+                    if (shData->touchCount > 0)
                         hidTouchRead(&shData->touchPos, 0);
                     else 
                         shData->touchPos = { 0 };
@@ -2923,13 +3065,6 @@ namespace tsl {
                         }
                         else
                             eventFire(&shData->comboEvent);
-                    }
-
-                    if (shData->touchPos.px >= cfg::FramebufferWidth && shData->overlayOpen) {
-                        if (shData->overlayOpen) {
-                            tsl::Overlay::get()->hide();
-                            shData->overlayOpen = false;
-                        }
                     }
 
                     shData->keysDownPending |= shData->keysDown;
@@ -3090,7 +3225,7 @@ namespace tsl {
                 {
                     std::scoped_lock lock(shData.dataMutex);
                     if (!overlay->fadeAnimationPlaying()) {
-                        overlay->handleInput(shData.keysDownPending, shData.keysHeld, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
+                        overlay->handleInput(shData.keysDownPending, shData.keysHeld, shData.touchCount > 0, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
                     }
                     shData.keysDownPending = 0;
                 }
