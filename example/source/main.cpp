@@ -9,8 +9,6 @@ public:
     // Called when this Gui gets loaded to create the UI
     // Allocate all your elements on the heap. libtesla will make sure to clean them up when not needed anymore
     virtual tsl::elm::Element* createUI() override {
-        static u8 value = 0;
-
         auto frame = new tsl::elm::OverlayFrame("Tesla Example", "v1.2.0");
         auto list = new tsl::elm::List();
         /*auto header = new tsl::elm::CustomDrawer([](tsl::gfx::Renderer* r, u16 x, u16 y, u16 w, u16 h) {
@@ -43,7 +41,8 @@ public:
 
         swapItem->setClickListener(callback);
 
-        list->addItem(new tsl::elm::TrackBar("\uE13C"));
+        list->addItem(new tsl::elm::TrackBar("\u2600"));
+        list->addItem(new tsl::elm::StepTrackBar("\uE13C", 20));
         list->addItem(new tsl::elm::ListItem("Test List Item 1"));
         list->addItem(swapItem);
         list->addItem(new tsl::elm::CategoryHeader("List Items"));
@@ -54,7 +53,7 @@ public:
         list->addItem(new tsl::elm::ListItem("Test List Item 7"));
         list->addItem(new tsl::elm::ListItem("Test List Item 8"));
         list->addItem(new tsl::elm::ToggleListItem("Test Toggle List Item", true));
-        list->addItem(new tsl::elm::StepTrackBar("\uE132", { "Selection 1", "Selection 2", "Selection 3" }));
+        list->addItem(new tsl::elm::NamedStepTrackBar("\uE132", { "Selection 1", "Selection 2", "Selection 3" }));
 
         frame->setContent(list);
         
