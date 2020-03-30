@@ -2221,8 +2221,14 @@ namespace tsl {
             }
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
-                if (initialX > this->getX() && initialX < (this->getX() + this->getWidth()) && initialY > this->getY() && initialY < (this->getY() + this->getHeight())) {
-                    if (currX > 0 && currX < (this->getX() + this->getWidth()) && currY > this->getY() && currY < (this->getY() + this->getHeight())) {
+                if (event == TouchEvent::Release) {
+                    this->m_interactionLocked = false;
+                    return false;
+                }
+                
+
+                if (!this->m_interactionLocked && initialX > this->getX() && initialX < (this->getX() + this->getWidth()) && initialY > this->getY() && initialY < (this->getY() + this->getHeight())) {
+                    if (currX > this->getX() + 50 && currX < (this->getX() + this->getWidth()) && currY > this->getY() && currY < (this->getY() + this->getHeight())) {
                         this->m_value = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
 
                         if (this->m_value < 0)
@@ -2234,6 +2240,8 @@ namespace tsl {
                         return true;
                     }
                 }
+                else
+                    this->m_interactionLocked = true;
 
                 return false;
             }
@@ -2341,6 +2349,7 @@ namespace tsl {
         protected:
             const char *m_icon = nullptr;
             s16 m_value = 0;
+            bool m_interactionLocked = false;
 
             std::function<void(u8)> m_valueChangedListener = [](u8){};
 
