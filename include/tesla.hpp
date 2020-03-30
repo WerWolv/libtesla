@@ -2274,13 +2274,18 @@ namespace tsl {
 
                 if (!this->m_interactionLocked && initialX > ELEMENT_LEFT_BOUND(this) && initialX < (ELEMENT_RIGHT_BOUND(this)) && initialY > ELEMENT_TOP_BOUND(this) && initialY < ELEMENT_BOTTOM_BOUND(this)) {
                     if (currX > ELEMENT_LEFT_BOUND(this) + 50 && currX < ELEMENT_RIGHT_BOUND(this) && currY > ELEMENT_TOP_BOUND(this) && currY < ELEMENT_BOTTOM_BOUND(this)) {
-                        this->m_value = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
+                        s16 newValue = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
 
-                        if (this->m_value < 0)
-                            this->m_value = 0;
+                        if (newValue < 0) {
+                            newValue = 0;
+                        } else if (newValue > 100) {
+                            newValue = 100;
+                        }
 
-                        if (this->m_value > 100)
-                            this->m_value = 100;
+                        if (newValue != this->m_value) {
+                            this->m_value = newValue;
+                            this->m_valueChangedListener(this->getProgress());
+                        }
 
                         return true;
                     }
@@ -2452,15 +2457,20 @@ namespace tsl {
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
                 if (initialX > ELEMENT_LEFT_BOUND(this) && initialX < ELEMENT_RIGHT_BOUND(this) && initialY > ELEMENT_TOP_BOUND(this) && initialY < ELEMENT_BOTTOM_BOUND(this)) {
                     if (currY > ELEMENT_TOP_BOUND(this) && currY < ELEMENT_BOTTOM_BOUND(this)) {
-                        this->m_value = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
+                        s16 newValue = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
 
-                        if (this->m_value < 0)
-                            this->m_value = 0;
+                        if (newValue < 0) {
+                            newValue = 0;
+                        } else if (newValue > 100) {
+                            newValue = 100;
+                        } else {
+                            newValue = std::round(newValue / (100.0F / (this->m_numSteps - 1))) * (100.0F / (this->m_numSteps - 1));
+                        }
 
-                        if (this->m_value > 100)
-                            this->m_value = 100;
-
-                        this->m_value = std::round(this->m_value / (100.0F / (this->m_numSteps - 1))) * (100.0F / (this->m_numSteps - 1));
+                        if (newValue != this->m_value) {
+                            this->m_value = newValue;
+                            this->m_valueChangedListener(this->getProgress());
+                        }
 
                         return true;
                     }
