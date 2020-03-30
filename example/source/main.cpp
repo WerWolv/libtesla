@@ -32,7 +32,7 @@ public:
         // List Items
         list->addItem(new tsl::elm::CategoryHeader("List items"));
 
-        auto *clickableListItem = new tsl::elm::ListItem("Clickable List Item");
+        auto *clickableListItem = new tsl::elm::ListItem("Clickable List Item", "...");
         clickableListItem->setClickListener([](u64 keys) { 
             if (keys & KEY_A) {
                 tsl::changeTo<GuiSecondary>();
