@@ -1,9 +1,22 @@
 #define TESLA_INIT_IMPL // If you have more than one file using the tesla header, only define this in the main one
 #include <tesla.hpp>    // The Tesla Header
 
+
+class GuiSecondary : public tsl::Gui {
+public:
+    GuiSecondary() {}
+
+    virtual tsl::elm::Element* createUI() override {
+        auto *rootFrame = new tsl::elm::OverlayFrame("Tesla Example", "v1.3.0 - Secondary Gui");
+
+        rootFrame->setContent(new tsl::elm::DebugRectangle(tsl::gfx::Color{ 0x8, 0x3, 0x8, 0xF }));
+
+        return rootFrame;
+    }
+};
+
 class GuiTest : public tsl::Gui {
 public:
-    s16 x, y;
     GuiTest(u8 arg1, u8 arg2, bool arg3) { }
 
     // Called when this Gui gets loaded to create the UI
@@ -18,6 +31,18 @@ public:
 
         // List Items
         list->addItem(new tsl::elm::CategoryHeader("List items"));
+
+        auto *clickableListItem = new tsl::elm::ListItem("Clickable List Item");
+        clickableListItem->setClickListener([](u64 keys) { 
+            if (keys & KEY_A) {
+                tsl::changeTo<GuiSecondary>();
+                return true;
+            }
+
+            return false;
+        });
+
+        list->addItem(clickableListItem);
         list->addItem(new tsl::elm::ListItem("Default List Item"));
         list->addItem(new tsl::elm::ToggleListItem("Toggle List Item", true));
         
@@ -51,8 +76,6 @@ public:
 
     // Called once every frame to handle inputs not handled by other UI elements
     virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
-        this->x = leftJoyStick.dx;
-        this->y = leftJoyStick.dy;
         return false;   // Return true here to singal the inputs have been consumed
     }
 };
