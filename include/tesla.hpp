@@ -1580,6 +1580,12 @@ namespace tsl {
                 }
             }
 
+            virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
+                if (this->m_contentElement != nullptr)
+                    return this->m_contentElement->onTouch(event, currX, currY, prevX, prevY, initialX, initialY);
+                else return false;
+            }
+
             virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
                 if (this->m_contentElement != nullptr)
                     return this->m_contentElement->requestFocus(oldFocus, direction);
