@@ -3226,6 +3226,14 @@ namespace tsl {
                                 shData->joyStickPosLeft.dy = joyStickPosLeft.dy;
                             if (joyStickPosLeft.dy < 0 && joyStickPosLeft.dy < shData->joyStickPosLeft.dy)
                                 shData->joyStickPosLeft.dy = joyStickPosLeft.dy;
+                            if (joyStickPosRight.dx > 0 && joyStickPosRight.dx > shData->joyStickPosRight.dx)
+                                shData->joyStickPosRight.dx = joyStickPosRight.dx;
+                            if (joyStickPosRight.dx < 0 && joyStickPosRight.dx < shData->joyStickPosRight.dx)
+                                shData->joyStickPosRight.dx = joyStickPosRight.dx;
+                            if (joyStickPosRight.dy > 0 && joyStickPosRight.dy > shData->joyStickPosRight.dy)
+                                shData->joyStickPosRight.dy = joyStickPosRight.dy;
+                            if (joyStickPosRight.dy < 0 && joyStickPosRight.dy < shData->joyStickPosRight.dy)
+                                shData->joyStickPosRight.dy = joyStickPosRight.dy;
                         }
                     }
 
