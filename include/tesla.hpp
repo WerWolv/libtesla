@@ -53,9 +53,18 @@
 
 #pragma GCC diagnostic pop
 
+#define ELEMENT_BOUNDS(elem) elem->getX(), elem->getY(), elem->getWidth(), elem->getHeight()
+
+#define ELEMENT_TOP_BOUND(elem) (elem->getY())
+#define ELEMENT_LEFT_BOUND(elem) (elem->getX())
+#define ELEMENT_RIGHT_BOUND(elem) (elem->getX() + elem->getWidth())
+#define ELEMENT_BOTTOM_BOUND(elem) (elem->getY() + elem->getHeight())
 
 #define ASSERT_EXIT(x) if (R_FAILED(x)) std::exit(1)
 #define ASSERT_FATAL(x) if (Result res = x; R_FAILED(res)) fatalThrow(res)
+
+#define PACKED __attribute__((packed))
+#define ALWAYS_INLINE __attribute__((always_inline))
 
 /// Evaluates an expression that returns a result, and returns the result if it would fail.
 #define R_TRY(resultExpr)               \
@@ -120,11 +129,15 @@ namespace tsl {
         Left,                       ///< Focus moved from left to rigth
         Right                       ///< Focus moved from right to left
     };
-
+    
+    /**
+     * @brief Current input controll mode
+     * 
+     */
     enum class InputMode {
-        Controller,
-        Touch,
-        TouchScroll
+        Controller,                 ///< Input from controller
+        Touch,                      ///< Touch input
+        TouchScroll                 ///< Moving/scrolling touch input
     };
 
     class Overlay;
@@ -193,6 +206,18 @@ namespace tsl {
         }
 
         /**
+         * @brief Wrapper for sd card access using stdio
+         * @note Consider using raw fs calls instead as they are faster and need less space
+         * 
+         * @param f wrapped function
+         */
+        static inline void doWithSDCardHandle(std::function<void()> f) {
+            fsdevMountSdmc();
+            f();
+            fsdevUnmountDevice("sdmc");
+        }
+
+        /**
          * @brief Guard that will execute a passed function at the end of the current scope
          *
          * @param f wrapped function
@@ -203,8 +228,8 @@ namespace tsl {
             private:
                 std::function<void()> f;
             public:
-                __attribute__((always_inline)) ScopeGuard(std::function<void()> f) : f(std::move(f)) { }
-                __attribute__((always_inline)) ~ScopeGuard() { if (f) { f(); } }
+                ALWAYS_INLINE ScopeGuard(std::function<void()> f) : f(std::move(f)) { }
+                ALWAYS_INLINE ~ScopeGuard() { if (f) { f(); } }
                 void dismiss() { f = nullptr; }
         };
 
@@ -232,7 +257,7 @@ namespace tsl {
         static void requestForeground(bool enabled) {
             u64 applicationAruid = 0, appletAruid = 0;
 
-            for (u64 programId = 0x0100000000001000ul; programId < 0x0100000000001020ul; programId++) {
+            for (u64 programId = 0x0100000000001000UL; programId < 0x0100000000001020UL; programId++) {
                 pmdmntGetProcessId(&appletAruid, programId);
                 
                 if (appletAruid != 0)
@@ -1190,7 +1215,7 @@ namespace tsl {
                 if (parent == nullptr)
                     this->layout(0, 0, cfg::FramebufferWidth, cfg::FramebufferHeight);
                 else
-                    this->layout(parent->getX(), parent->getY(), parent->getWidth(), parent->getHeight());
+                    this->layout(ELEMENT_BOUNDS(parent));
             }
 
             /**
@@ -1225,7 +1250,7 @@ namespace tsl {
                 animColor.g = saturation;
                 animColor.b = saturation;
 
-                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a(animColor));
+                renderer->drawRect(ELEMENT_BOUNDS(this), a(animColor));
             }
             
             /**
@@ -1235,7 +1260,7 @@ namespace tsl {
              * @param renderer Renderer
              */
             virtual void drawFocusBackground(gfx::Renderer *renderer) {
-                renderer->drawRect(this->m_x, this->m_y, this->m_width, this->m_height, a(0xF000));
+                renderer->drawRect(ELEMENT_BOUNDS(this), a(0xF000));
 
                 if (this->m_clickAnimationProgress > 0) {
                     this->drawClickAnimation(renderer);
@@ -1290,10 +1315,10 @@ namespace tsl {
                     }
                 }
 
-                renderer->drawRect(this->m_x + x - 4, this->m_y + y - 4, this->m_width + 8, 4, a(highlightColor));
-                renderer->drawRect(this->m_x + x - 4, this->m_y + y + this->m_height, this->m_width + 8, 4, a(highlightColor));
-                renderer->drawRect(this->m_x + x - 4, this->m_y + y, 4, this->m_height, a(highlightColor));
-                renderer->drawRect(this->m_x + x + this->m_width, this->m_y + y, 4, this->m_height, a(highlightColor));
+                renderer->drawRect(this->getX() + x - 4, this->getY() + y - 4, this->getWidth() + 8, 4, a(highlightColor));
+                renderer->drawRect(this->getX() + x - 4, this->getY() + y + this->getHeight(), this->getWidth() + 8, 4, a(highlightColor));
+                renderer->drawRect(this->getX() + x - 4, this->getY() + y, 4, this->getHeight(), a(highlightColor));
+                renderer->drawRect(this->getX() + x + this->getWidth(), this->getY() + y, 4, this->getHeight(), a(highlightColor));
 
             }
 
@@ -1426,8 +1451,8 @@ namespace tsl {
             virtual ~CustomDrawer() {}
 
             virtual void draw(gfx::Renderer* renderer) override {
-                renderer->enableScissoring(this->getX(), this->getY(), this->getWidth(), this->getHeight());
-                this->m_renderFunc(renderer, this->getX(), this->getY(), this->getWidth(), this->getHeight());
+                renderer->enableScissoring(ELEMENT_BOUNDS(this));
+                this->m_renderFunc(renderer, ELEMENT_BOUNDS(this));
                 renderer->disableScissoring();
             }
 
@@ -1490,6 +1515,12 @@ namespace tsl {
             }
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
+                // Discard touches outside bounds
+                if (currX < ELEMENT_LEFT_BOUND(this->m_contentElement) || currX > ELEMENT_RIGHT_BOUND(this->m_contentElement))
+                    return false;
+                if (currY < ELEMENT_TOP_BOUND(this->m_contentElement) || currY > ELEMENT_BOTTOM_BOUND(this->m_contentElement))
+                    return false;
+
                 if (this->m_contentElement != nullptr)
                     return this->m_contentElement->onTouch(event, currX, currY, prevX, prevY, initialX, initialY);
                 else return false;
@@ -1580,6 +1611,18 @@ namespace tsl {
                 }
             }
 
+            virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
+                // Discard touches outside bounds
+                if (currX < ELEMENT_LEFT_BOUND(this->m_contentElement) || currX > ELEMENT_RIGHT_BOUND(this->m_contentElement))
+                    return false;
+                if (currY < ELEMENT_TOP_BOUND(this->m_contentElement) || currY > ELEMENT_BOTTOM_BOUND(this->m_contentElement))
+                    return false;
+                
+                if (this->m_contentElement != nullptr)
+                    return this->m_contentElement->onTouch(event, currX, currY, prevX, prevY, initialX, initialY);
+                else return false;
+            }
+
             virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
                 if (this->m_contentElement != nullptr)
                     return this->m_contentElement->requestFocus(oldFocus, direction);
@@ -1643,7 +1686,7 @@ namespace tsl {
             virtual ~DebugRectangle() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a(this->m_color));
+                renderer->drawRect(ELEMENT_BOUNDS(this), a(this->m_color));
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {}
@@ -1689,10 +1732,10 @@ namespace tsl {
                 }
                 this->m_itemsToAdd.clear();
 
-                renderer->enableScissoring(this->getX(), this->getY() - 5, this->getWidth(), this->getHeight() + 4);
+                renderer->enableScissoring(ELEMENT_LEFT_BOUND(this), ELEMENT_TOP_BOUND(this) - 5, this->getWidth(), this->getHeight() + 4);
 
                 for (auto &entry : this->m_items) {
-                    if (entry->getY() + entry->getHeight() > this->getY() && entry->getY() < this->getY() + this->getHeight()) {
+                    if (ELEMENT_BOTTOM_BOUND(entry) > ELEMENT_TOP_BOUND(this) && ELEMENT_TOP_BOUND(entry) < ELEMENT_BOTTOM_BOUND(this)) {
                         entry->frame(renderer);
                     }
                 }
@@ -1703,9 +1746,9 @@ namespace tsl {
                     float scrollbarHeight = static_cast<float>(this->getHeight() * this->getHeight()) / this->m_listHeight;
                     float scrollbarOffset = (static_cast<double>(this->m_offset)) / static_cast<double>(this->m_listHeight - this->getHeight()) * (this->getHeight() - std::ceil(scrollbarHeight));
                     
-                    renderer->drawRect(this->getX() + this->getWidth() + 10, this->getY() + scrollbarOffset, 5, scrollbarHeight - 50, a(tsl::style::color::ColorHandle));
-                    renderer->drawCircle(this->getX() + this->getWidth() + 12, this->getY() + scrollbarOffset, 2, true, a(tsl::style::color::ColorHandle));
-                    renderer->drawCircle(this->getX() + this->getWidth() + 12, this->getY() + scrollbarOffset + scrollbarHeight - 50, 2, true, a(tsl::style::color::ColorHandle));
+                    renderer->drawRect(ELEMENT_RIGHT_BOUND(this) + 10, this->getY() + scrollbarOffset, 5, scrollbarHeight - 50, a(tsl::style::color::ColorHandle));
+                    renderer->drawCircle(ELEMENT_RIGHT_BOUND(this) + 12, this->getY() + scrollbarOffset, 2, true, a(tsl::style::color::ColorHandle));
+                    renderer->drawCircle(ELEMENT_RIGHT_BOUND(this) + 12, this->getY() + scrollbarOffset + scrollbarHeight - 50, 2, true, a(tsl::style::color::ColorHandle));
                     
                     float prevOffset = this->m_offset;
 
@@ -1737,12 +1780,20 @@ namespace tsl {
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
                 bool handled = false;
 
+                // Discard touches out of bounds
+                if (currX < ELEMENT_LEFT_BOUND(this) || currX > ELEMENT_RIGHT_BOUND(this))
+                    return false;
+                if (currY < ELEMENT_TOP_BOUND(this) || currY > ELEMENT_BOTTOM_BOUND(this))
+                    return false;
+
+                // Direct touches to all children
                 for (auto &item : this->m_items)
                     handled |= item->onTouch(event, currX, currY, prevX, prevY, initialX, initialY);
 
                 if (handled)
                     return true;
 
+                // Handle scrolling
                 if (event != TouchEvent::Release && Element::getInputMode() == InputMode::TouchScroll) {
                     if (prevX != 0 && prevY != 0)
                         this->m_nextOffset += (prevY - currY);
@@ -1916,15 +1967,14 @@ namespace tsl {
              * 
              * @param text Initial description text
              */
-            ListItem(const std::string& text)
-                : Element(), m_text(text) {
+            ListItem(const std::string& text, const std::string& value = "")
+                : Element(), m_text(text), m_value(value) {
             }
             virtual ~ListItem() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
                 if (this->m_touched && Element::getInputMode() == InputMode::Touch) {
-                    renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a(tsl::style::color::ColorClickAnimation));
-                    this->m_touched = false;
+                    renderer->drawRect(ELEMENT_BOUNDS(this), a(tsl::style::color::ColorClickAnimation));
                 }
 
                 if (this->m_maxWidth == 0) {
@@ -1947,7 +1997,7 @@ namespace tsl {
                 }
 
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
-                renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX(), ELEMENT_BOTTOM_BOUND(this), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
 
                 const char *text = m_text.c_str();
                 if (this->m_trunctuated) {
@@ -1994,7 +2044,8 @@ namespace tsl {
 
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
-                this->m_touched = currX > this->getX() && currX < (this->getX() + this->getWidth()) && currY > this->getY() && currY < (this->getY() + this->getHeight());
+                if (event == TouchEvent::Touch)
+                    this->m_touched = currX > ELEMENT_LEFT_BOUND(this) && currX < (ELEMENT_RIGHT_BOUND(this)) && currY > ELEMENT_TOP_BOUND(this) && currY < (ELEMENT_BOTTOM_BOUND(this));
                 
                 if (event == TouchEvent::Release && this->m_touched) {
                     this->m_touched = false;
@@ -2145,11 +2196,11 @@ namespace tsl {
             virtual ~CategoryHeader() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->drawRect(this->getX() - 2, this->getY() + this->getHeight() - 30, 5, 23, a(tsl::style::color::ColorHeaderBar));
-                renderer->drawString(this->m_text.c_str(), false, this->getX() + 13, this->getY() + this->getHeight() - 12, 15, a(tsl::style::color::ColorText));
+                renderer->drawRect(this->getX() - 2, ELEMENT_BOTTOM_BOUND(this) - 30, 5, 23, a(tsl::style::color::ColorHeaderBar));
+                renderer->drawString(this->m_text.c_str(), false, this->getX() + 13, ELEMENT_BOTTOM_BOUND(this) - 12, 15, a(tsl::style::color::ColorText));
 
                 if (this->m_hasSeparator)
-                    renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
+                    renderer->drawRect(this->getX(), ELEMENT_BOTTOM_BOUND(this), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
@@ -2215,8 +2266,14 @@ namespace tsl {
             }
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
-                if (initialX > this->getX() && initialX < (this->getX() + this->getWidth()) && initialY > this->getY() && initialY < (this->getY() + this->getHeight())) {
-                    if (currX > 0 && currX < (this->getX() + this->getWidth()) && currY > this->getY() && currY < (this->getY() + this->getHeight())) {
+                if (event == TouchEvent::Release) {
+                    this->m_interactionLocked = false;
+                    return false;
+                }
+                
+
+                if (!this->m_interactionLocked && initialX > ELEMENT_LEFT_BOUND(this) && initialX < (ELEMENT_RIGHT_BOUND(this)) && initialY > ELEMENT_TOP_BOUND(this) && initialY < ELEMENT_BOTTOM_BOUND(this)) {
+                    if (currX > ELEMENT_LEFT_BOUND(this) + 50 && currX < ELEMENT_RIGHT_BOUND(this) && currY > ELEMENT_TOP_BOUND(this) && currY < ELEMENT_BOTTOM_BOUND(this)) {
                         this->m_value = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
 
                         if (this->m_value < 0)
@@ -2228,13 +2285,15 @@ namespace tsl {
                         return true;
                     }
                 }
+                else
+                    this->m_interactionLocked = true;
 
                 return false;
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
-                renderer->drawRect(this->getX(), this->getY() + this->getHeight(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX(), ELEMENT_BOTTOM_BOUND(this), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
 
                 renderer->drawString(this->m_icon, false, this->getX() + 15, this->getY() + 50, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
 
@@ -2335,6 +2394,7 @@ namespace tsl {
         protected:
             const char *m_icon = nullptr;
             s16 m_value = 0;
+            bool m_interactionLocked = false;
 
             std::function<void(u8)> m_valueChangedListener = [](u8){};
 
@@ -2390,8 +2450,8 @@ namespace tsl {
             }
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
-                if (initialX > this->getX() && initialX < (this->getX() + this->getWidth()) && initialY > this->getY() && initialY < (this->getY() + this->getHeight())) {
-                    if (currY > this->getY() && currY < (this->getY() + this->getHeight())) {
+                if (initialX > ELEMENT_LEFT_BOUND(this) && initialX < ELEMENT_RIGHT_BOUND(this) && initialY > ELEMENT_TOP_BOUND(this) && initialY < ELEMENT_BOTTOM_BOUND(this)) {
+                    if (currY > ELEMENT_TOP_BOUND(this) && currY < ELEMENT_BOTTOM_BOUND(this)) {
                         this->m_value = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
 
                         if (this->m_value < 0)
@@ -2932,12 +2992,6 @@ namespace tsl {
             }
             
             if (touchDetected) {
-                if (!oldTouchDetected) {
-                    initialTouchPos = touchPos;
-                    elm::Element::setInputMode(InputMode::Touch);
-                    currentGui->removeFocus();
-                    touchEvent = elm::TouchEvent::Touch;
-                }
 
                 u32 xDistance = std::abs(static_cast<s32>(initialTouchPos.px) - static_cast<s32>(touchPos.px));
                 u32 yDistance = std::abs(static_cast<s32>(initialTouchPos.py) - static_cast<s32>(touchPos.py));
@@ -2952,6 +3006,13 @@ namespace tsl {
                     if (touchEvent != elm::TouchEvent::Scroll)
                         touchEvent = elm::TouchEvent::Hold;
                 }
+
+                if (!oldTouchDetected) {
+                    initialTouchPos = touchPos;
+                    elm::Element::setInputMode(InputMode::Touch);
+                    currentGui->removeFocus();
+                    touchEvent = elm::TouchEvent::Touch;
+                }
                 
 
                 if (currentGui != nullptr && topElement != nullptr)
@@ -2959,6 +3020,7 @@ namespace tsl {
 
                 oldTouchPos = touchPos;
 
+                // Hide overlay when touching out of bounds
                 if (touchPos.px >= cfg::FramebufferWidth) {
                     if (tsl::elm::Element::getInputMode() == tsl::InputMode::Touch) {
                         oldTouchPos = { 0 };
@@ -2968,6 +3030,10 @@ namespace tsl {
                     }
                 }
             } else {
+                if (oldTouchPos.px < 150U && oldTouchPos.py > cfg::FramebufferHeight - 73U)
+                    if (initialTouchPos.px < 150U && initialTouchPos.py > cfg::FramebufferHeight - 73U)
+                        this->goBack();
+
                 elm::Element::setInputMode(InputMode::Controller);
 
                 oldTouchPos = { 0 };
