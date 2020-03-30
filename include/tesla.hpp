@@ -3005,6 +3005,10 @@ namespace tsl {
                     }
                 }
             } else {
+                if (oldTouchPos.px < 150U && oldTouchPos.py > cfg::FramebufferHeight - 73U)
+                    if (initialTouchPos.px < 150U && initialTouchPos.py > cfg::FramebufferHeight - 73U)
+                        this->goBack();
+
                 elm::Element::setInputMode(InputMode::Controller);
 
                 oldTouchPos = { 0 };
