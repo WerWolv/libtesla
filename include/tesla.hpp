@@ -1930,7 +1930,6 @@ namespace tsl {
             virtual void draw(gfx::Renderer *renderer) override {
                 if (this->m_touched && Element::getInputMode() == InputMode::Touch) {
                     renderer->drawRect(this->getX(), this->getY(), this->getWidth(), this->getHeight(), a(tsl::style::color::ColorClickAnimation));
-                    this->m_touched = false;
                 }
 
                 if (this->m_maxWidth == 0) {
@@ -2000,7 +1999,8 @@ namespace tsl {
 
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
-                this->m_touched = currX > this->getX() && currX < (this->getX() + this->getWidth()) && currY > this->getY() && currY < (this->getY() + this->getHeight());
+                if (event == TouchEvent::Touch)
+                    this->m_touched = currX > this->getX() && currX < (this->getX() + this->getWidth()) && currY > this->getY() && currY < (this->getY() + this->getHeight());
                 
                 if (event == TouchEvent::Release && this->m_touched) {
                     this->m_touched = false;
@@ -2938,12 +2938,6 @@ namespace tsl {
             }
             
             if (touchDetected) {
-                if (!oldTouchDetected) {
-                    initialTouchPos = touchPos;
-                    elm::Element::setInputMode(InputMode::Touch);
-                    currentGui->removeFocus();
-                    touchEvent = elm::TouchEvent::Touch;
-                }
 
                 u32 xDistance = std::abs(static_cast<s32>(initialTouchPos.px) - static_cast<s32>(touchPos.px));
                 u32 yDistance = std::abs(static_cast<s32>(initialTouchPos.py) - static_cast<s32>(touchPos.py));
@@ -2957,6 +2951,13 @@ namespace tsl {
                 } else {
                     if (touchEvent != elm::TouchEvent::Scroll)
                         touchEvent = elm::TouchEvent::Hold;
+                }
+
+                if (!oldTouchDetected) {
+                    initialTouchPos = touchPos;
+                    elm::Element::setInputMode(InputMode::Touch);
+                    currentGui->removeFocus();
+                    touchEvent = elm::TouchEvent::Touch;
                 }
                 
 
