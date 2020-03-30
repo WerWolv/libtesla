@@ -1490,6 +1490,12 @@ namespace tsl {
             }
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
+                // Discard touches outside bounds
+                if (currX < this->m_contentElement->getX() || currX > this->m_contentElement->getX() + this->m_contentElement->getWidth())
+                    return false;
+                if (currY < this->m_contentElement->getY() || currY > this->m_contentElement->getY() + this->m_contentElement->getHeight())
+                    return false;
+
                 if (this->m_contentElement != nullptr)
                     return this->m_contentElement->onTouch(event, currX, currY, prevX, prevY, initialX, initialY);
                 else return false;
@@ -1581,6 +1587,12 @@ namespace tsl {
             }
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
+                // Discard touches outside bounds
+                if (currX < this->m_contentElement->getX() || currX > this->m_contentElement->getX() + this->m_contentElement->getWidth())
+                    return false;
+                if (currY < this->m_contentElement->getY() || currY > this->m_contentElement->getY() + this->m_contentElement->getHeight())
+                    return false;
+                
                 if (this->m_contentElement != nullptr)
                     return this->m_contentElement->onTouch(event, currX, currY, prevX, prevY, initialX, initialY);
                 else return false;
@@ -1743,12 +1755,20 @@ namespace tsl {
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
                 bool handled = false;
 
+                // Discard touches out of bounds
+                if (currX < this->getX() || currX > this->getX() + this->getWidth())
+                    return false;
+                if (currY < this->getY() || currY > this->getY() + this->getHeight())
+                    return false;
+
+                // Direct touches to all children
                 for (auto &item : this->m_items)
                     handled |= item->onTouch(event, currX, currY, prevX, prevY, initialX, initialY);
 
                 if (handled)
                     return true;
 
+                // Handle scrolling
                 if (event != TouchEvent::Release && Element::getInputMode() == InputMode::TouchScroll) {
                     if (prevX != 0 && prevY != 0)
                         this->m_nextOffset += (prevY - currY);
@@ -2975,6 +2995,7 @@ namespace tsl {
 
                 oldTouchPos = touchPos;
 
+                // Hide overlay when touching out of bounds
                 if (touchPos.px >= cfg::FramebufferWidth) {
                     if (tsl::elm::Element::getInputMode() == tsl::InputMode::Touch) {
                         oldTouchPos = { 0 };
