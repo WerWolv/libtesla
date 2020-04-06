@@ -1,5 +1,5 @@
 #define TESLA_INIT_IMPL // If you have more than one file using the tesla header, only define this in the main one
-#include <tesla.hpp>    // The Tesla Header
+#include <tesla_extended_components.hpp>    // The Tesla Header for extended components, use <tesla.hpp> is you need only standard components
 
 
 class GuiSecondary : public tsl::Gui {
@@ -10,6 +10,78 @@ public:
         auto *rootFrame = new tsl::elm::OverlayFrame("Tesla Example", "v1.3.1 - Secondary Gui");
 
         rootFrame->setContent(new tsl::elm::DebugRectangle(tsl::gfx::Color{ 0x8, 0x3, 0x8, 0xF }));
+
+        return rootFrame;
+    }
+};
+
+class GuiDoubleLayout1 : public tsl::Gui {
+public:
+    GuiDoubleLayout1() {}
+
+    virtual tsl::elm::Element* createUI() override {
+        auto *rootFrame = new tsl::elm::DoubleSectionOverlayFrame("Tesla Example", "v1.3.1 - Double Section Gui 1", tsl::SectionsLayout::big_bottom, true);
+        auto *top_list = new tsl::elm::List();
+        auto *bottom_list = new tsl::elm::List();
+
+        for (int i = 0; i < 10; i++) {
+            top_list->addItem(new tsl::elm::SmallListItem("Small List Item " + std::to_string(i)));
+        }
+
+        for (int i = 0; i < 10; i++) {
+            bottom_list->addItem(new tsl::elm::SmallListItem("Small List Item " + std::to_string(i)));
+        }
+
+        rootFrame->setTopSection(top_list);
+        rootFrame->setBottomSection(bottom_list);
+
+        return rootFrame;
+    }
+};
+
+class GuiDoubleLayout2 : public tsl::Gui {
+public:
+    GuiDoubleLayout2() {}
+
+    virtual tsl::elm::Element* createUI() override {
+        auto *rootFrame = new tsl::elm::DoubleSectionOverlayFrame("Tesla Example", "v1.3.1 - Double Section Gui 2", tsl::SectionsLayout::same, true);
+        auto *top_list = new tsl::elm::List();
+        auto *bottom_list = new tsl::elm::List();
+
+        for (int i = 0; i < 10; i++) {
+            top_list->addItem(new tsl::elm::SmallListItem("Small List Item " + std::to_string(i)));   
+        }
+
+        for (int i = 0; i < 10; i++) {
+            bottom_list->addItem(new tsl::elm::SmallListItem("Small List Item " + std::to_string(i)));
+        }
+
+        rootFrame->setTopSection(top_list);
+        rootFrame->setBottomSection(bottom_list);
+
+        return rootFrame;
+    }
+};
+
+class GuiDoubleLayout3 : public tsl::Gui {
+public:
+    GuiDoubleLayout3() {}
+
+    virtual tsl::elm::Element* createUI() override {
+        auto *rootFrame = new tsl::elm::DoubleSectionOverlayFrame("Tesla Example", "v1.3.1 - Double Section Gui 3", tsl::SectionsLayout::big_top, true);
+        auto *top_list = new tsl::elm::List();
+        auto *bottom_list = new tsl::elm::List();
+
+        for (int i = 0; i < 10; i++) {
+            top_list->addItem(new tsl::elm::SmallListItem("Small List Item " + std::to_string(i)));
+        }
+
+        for (int i = 0; i < 10; i++) {
+            bottom_list->addItem(new tsl::elm::SmallListItem("Small List Item " + std::to_string(i)));
+        }
+
+        rootFrame->setTopSection(top_list);
+        rootFrame->setBottomSection(bottom_list);
 
         return rootFrame;
     }
@@ -61,6 +133,41 @@ public:
         list->addItem(new tsl::elm::TrackBar("\u2600"));
         list->addItem(new tsl::elm::StepTrackBar("\uE13C", 20));
         list->addItem(new tsl::elm::NamedStepTrackBar("\uE132", { "Selection 1", "Selection 2", "Selection 3" }));
+
+        list->addItem(new tsl::elm::BigCategoryHeader("Multi Section Overlays"));
+        
+        auto *doubleSection1 = new tsl::elm::SmallListItem("Double Section", "1/3 : 2/3");
+        doubleSection1->setClickListener([](u64 keys) { 
+            if (keys & KEY_A) {
+                tsl::changeTo<GuiDoubleLayout1>();
+                return true;
+            }
+
+            return false;
+        });
+        list->addItem(doubleSection1);
+        
+        auto *doubleSection2 = new tsl::elm::SmallListItem("Double Section", "1/2 : 1/2");
+        doubleSection2->setClickListener([](u64 keys) { 
+            if (keys & KEY_A) {
+                tsl::changeTo<GuiDoubleLayout2>();
+                return true;
+            }
+
+            return false;
+        });
+        list->addItem(doubleSection2);
+
+        auto *doubleSection3 = new tsl::elm::SmallListItem("Double Section", "2/3 : 1/3");
+        doubleSection3->setClickListener([](u64 keys) { 
+            if (keys & KEY_A) {
+                tsl::changeTo<GuiDoubleLayout3>();
+                return true;
+            }
+
+            return false;
+        });
+        list->addItem(doubleSection3);
 
         // Add the list to the frame for it to be drawn
         frame->setContent(list);
