@@ -113,6 +113,7 @@ namespace tsl {
             constexpr u16 ColorDescription      = 0xFAAA;   ///< Description text color
             constexpr u16 ColorHeaderBar        = 0xFCCC;   ///< Category header rectangle color
             constexpr u16 ColorClickAnimation   = 0xF220;
+            constexpr u16 ColorWarning          = 0xF77F;
         }
     }
 
@@ -2026,7 +2027,7 @@ namespace tsl {
 
                 renderer->drawString(text, false, this->getX() + 20, this->getY() + 45, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
 
-                renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 45, 20, this->m_faint ? a(tsl::style::color::ColorDescription) : a(tsl::style::color::ColorHighlight));
+                renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 45, 20, a(this->m_color));
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
@@ -2090,11 +2091,28 @@ namespace tsl {
              * @brief Sets the right hand value text of the list item
              * 
              * @param value Text
-             * @param faint Should the text be drawn in a glowing green or a faint gray
+             * @param color Color the text should be drawn in, default a glowing green
+             */
+            virtual inline void setColoredValue(const std::string& value, u16 color = tsl::style::color::ColorHighlight) {
+                this->m_value = value;
+                this->m_color = color;
+                this->m_maxWidth = 0;
+            }
+
+            /**
+             * @brief Sets the right hand value text of the list item
+             * 
+             * @param value Text
+             * @param faint Should the text be drawn in a glowing green or a gray
              */
             virtual inline void setValue(const std::string& value, bool faint = false) {
                 this->m_value = value;
                 this->m_faint = faint;
+                if(m_faint==true)
+                    this->m_color = tsl::style::color::ColorDescription;
+                else
+                    this->m_color = tsl::style::color::ColorHighlight;
+                    
                 this->m_maxWidth = 0;
             }
 
@@ -2107,9 +2125,10 @@ namespace tsl {
             bool m_scroll = false;
             bool m_trunctuated = false;
             bool m_faint = false;
-
+            
             bool m_touched = false;
 
+            u16 m_color = tsl::style::color::ColorHighlight;
             u16 m_maxScroll = 0;
             u16 m_scrollOffset = 0;
             u32 m_maxWidth = 0;
@@ -2405,7 +2424,7 @@ namespace tsl {
 
         private:
             virtual inline void setText(const std::string& text) {}
-            virtual inline void setValue(const std::string& value, bool faint = false) {}
+            virtual inline void setValue(const std::string& value, bool color = false) {}
         };
 
 

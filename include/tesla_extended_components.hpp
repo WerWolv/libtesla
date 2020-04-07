@@ -109,7 +109,7 @@ namespace tsl {
 
                 renderer->drawString(text, false, this->getX() + 20, this->getY() + 25, 15, a(tsl::style::color::ColorText), this->m_maxWidth);
 
-                renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 25, 15, this->m_faint ? a(tsl::style::color::ColorDescription) : a(tsl::style::color::ColorHighlight));
+                renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 25, 15, a(this->m_color));
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
@@ -173,11 +173,28 @@ namespace tsl {
              * @brief Sets the right hand value text of the list item
              * 
              * @param value Text
-             * @param faint Should the text be drawn in a glowing green or a faint gray
+             * @param color Color the text should be drawn, default is a glowing green
+             */
+            virtual inline void setColoredValue(const std::string& value, u16 color = tsl::style::color::ColorHighlight) {
+                this->m_value = value;
+                this->m_color = color;
+                this->m_maxWidth = 0;
+            }
+
+            /**
+             * @brief Sets the right hand value text of the list item
+             * 
+             * @param value Text
+             * @param faint Should the text be drawn in a glowing green or a gray
              */
             virtual inline void setValue(const std::string& value, bool faint = false) {
                 this->m_value = value;
                 this->m_faint = faint;
+                if(m_faint==true)
+                    this->m_color = tsl::style::color::ColorDescription;
+                else
+                    this->m_color = tsl::style::color::ColorHighlight;
+                    
                 this->m_maxWidth = 0;
             }
 
@@ -193,6 +210,7 @@ namespace tsl {
 
             bool m_touched = false;
 
+            u16 m_color = tsl::style::color::ColorHighlight;
             u16 m_maxScroll = 0;
             u16 m_scrollOffset = 0;
             u32 m_maxWidth = 0;
