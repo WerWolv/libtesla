@@ -2125,7 +2125,7 @@ namespace tsl {
             bool m_scroll = false;
             bool m_trunctuated = false;
             bool m_faint = false;
-            
+
             bool m_touched = false;
 
             u16 m_color = tsl::style::color::ColorHighlight;
@@ -2424,7 +2424,7 @@ namespace tsl {
 
         private:
             virtual inline void setText(const std::string& text) {}
-            virtual inline void setValue(const std::string& value, bool color = false) {}
+            virtual inline void setValue(const std::string& value, bool faint = false) {}
         };
 
 
