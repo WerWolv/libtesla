@@ -1724,9 +1724,26 @@ namespace tsl {
                     this->m_clearList = false;
                 }
 
-                for (auto &element : this->m_itemsToAdd) {
+                for (auto element : this->m_itemsToRemove) {
+                    const auto &it = std::find(this->m_items.cbegin(), this->m_items.cend(), element);
+                    if (it != this->m_items.end()) {
+                        this->m_items.erase(it);
+                        this->m_offset = 0;
+                        this->m_focusedIndex = 0;
+                        this->invalidate();
+                    }
+                    delete element;
+                }
+                this->m_itemsToRemove.clear();
+
+                for (auto [index, element] : this->m_itemsToAdd) {
                     element->invalidate();
-                    this->m_items.push_back(element);
+                    if (index >= 0 && (this->m_items.size() > static_cast<size_t>(index))) {
+                        const auto& it = this->m_items.cbegin() + index;
+                        this->m_items.insert(it, element);
+                    } else {
+                        this->m_items.push_back(element);
+                    }
                     this->invalidate();
                     this->updateScrollOffset();
                 }
@@ -1814,9 +1831,10 @@ namespace tsl {
              * @brief Adds a new item to the list before the next frame starts
              * 
              * @param element Element to add
+             * @param index Index in the list where the item should be inserted. -1 or greater list size will insert it at the end
              * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
              */
-            virtual void addItem(Element *element, u16 height = 0) final {
+            virtual void addItem(Element *element, int index = -1, u16 height = 0) final {
                 if (element != nullptr) {
                     if (height != 0)
                         element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
@@ -1824,9 +1842,30 @@ namespace tsl {
                     element->setParent(this);
                     element->invalidate();
 
-                    this->m_itemsToAdd.push_back(element);
+                    this->m_itemsToAdd.emplace_back(index, element);
                 }
+            }
 
+            /**
+             * @brief Removes an item form the list and deletes it
+             * @note Item will be deleted even if it wasn't found in the list
+             * 
+             * @param element Element to delete from list
+             */
+            virtual void removeItem(Element *element) {
+                if (element != nullptr)
+                    this->m_itemsToRemove.emplace_back(element);
+            }
+
+            /**
+             * @brief Try to remove an item from the list
+             * 
+             * @param index Index of element in list
+             */
+            virtual void removeIndex(size_t index) {
+                if (index < this->m_items.size()) {
+                    removeItem(this->m_items[index]);
+                }
             }
 
             /**
@@ -1927,7 +1966,8 @@ namespace tsl {
             s32 m_listHeight = 0;
 
             bool m_clearList = false;
-            std::vector<Element *> m_itemsToAdd;
+            std::vector<Element *> m_itemsToRemove;
+            std::vector<std::pair<int, Element *>> m_itemsToAdd;
 
         private:
 

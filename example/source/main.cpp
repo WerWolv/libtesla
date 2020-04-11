@@ -43,6 +43,17 @@ public:
         });
 
         list->addItem(clickableListItem);
+
+        auto delitem = new tsl::elm::ListItem("Click to delete");
+        delitem->setClickListener([list, delitem](u64 keys) -> bool {
+            if (keys & KEY_A) {
+                list->removeItem(delitem);
+                return true;
+            }
+            return false;
+        });
+        list->addItem(delitem);
+
         list->addItem(new tsl::elm::ListItem("Default List Item"));
         list->addItem(new tsl::elm::ToggleListItem("Toggle List Item", true));
         
@@ -54,13 +65,13 @@ public:
             renderer->drawRect(x + 130, y + 30, 60, 40, renderer->a(0xFF00));
             renderer->drawString("Hello :)", false, x + 250, y + 70, 20, renderer->a(0xFF0F));
             renderer->drawRect(x + 40, y + 90, 300, 10, renderer->a(0xF0FF));
-        }), 100);
+        }), -1, 100);
 
         // Track bars
         list->addItem(new tsl::elm::CategoryHeader("Track bars"));
         list->addItem(new tsl::elm::TrackBar("\u2600"));
         list->addItem(new tsl::elm::StepTrackBar("\uE13C", 20));
-        list->addItem(new tsl::elm::NamedStepTrackBar("\uE132", { "Selection 1", "Selection 2", "Selection 3" }));
+        list->addItem(new tsl::elm::NamedStepTrackBar("\uE132", { "Selection 1", "Selection 2", "Selection 3" }), 0);
 
         // Add the list to the frame for it to be drawn
         frame->setContent(list);
