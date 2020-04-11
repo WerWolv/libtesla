@@ -1724,22 +1724,10 @@ namespace tsl {
                     this->m_clearList = false;
                 }
 
-                for (auto element : this->m_itemsToRemove) {
-                    const auto &it = std::find(this->m_items.cbegin(), this->m_items.cend(), element);
-                    if (it != this->m_items.end()) {
-                        this->m_items.erase(it);
-                        this->m_offset = 0;
-                        this->m_focusedIndex = 0;
-                        this->invalidate();
-                    }
-                    delete element;
-                }
-                this->m_itemsToRemove.clear();
-
                 for (auto [index, element] : this->m_itemsToAdd) {
                     element->invalidate();
-                    if (index >= 0 && (this->m_items.size() > static_cast<size_t>(index))) {
-                        const auto& it = this->m_items.cbegin() + index;
+                    if (index.has_value() && (this->m_items.size() > index.value())) {
+                        const auto& it = this->m_items.cbegin() + index.value();
                         this->m_items.insert(it, element);
                     } else {
                         this->m_items.push_back(element);
@@ -1748,6 +1736,21 @@ namespace tsl {
                     this->updateScrollOffset();
                 }
                 this->m_itemsToAdd.clear();
+
+                for (auto element : this->m_itemsToRemove) {
+                    for (size_t i = 0; i < this->m_items.size(); i++) {
+                        if (this->m_items[i] == element) {
+                            this->m_items.erase(this->m_items.cbegin() + i);
+                            if (this->m_focusedIndex >= i) {
+                                this->m_focusedIndex--;
+                            }
+                            this->invalidate();
+                            delete element;
+                            break;
+                        }
+                    }
+                }
+                this->m_itemsToRemove.clear();
 
                 renderer->enableScissoring(ELEMENT_LEFT_BOUND(this), ELEMENT_TOP_BOUND(this) - 5, this->getWidth(), this->getHeight() + 4);
 
@@ -1834,7 +1837,7 @@ namespace tsl {
              * @param index Index in the list where the item should be inserted. -1 or greater list size will insert it at the end
              * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
              */
-            virtual void addItem(Element *element, int index = -1, u16 height = 0) final {
+            virtual void addItem(Element *element, std::optional<size_t> index = {}, u16 height = 0) final {
                 if (element != nullptr) {
                     if (height != 0)
                         element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
@@ -1848,9 +1851,9 @@ namespace tsl {
 
             /**
              * @brief Removes an item form the list and deletes it
-             * @note Item will be deleted even if it wasn't found in the list
+             * @note Item will only be deleted if it was found in the list
              * 
-             * @param element Element to delete from list
+             * @param element Element to remove from list. Call \ref Gui::removeFocus before.
              */
             virtual void removeItem(Element *element) {
                 if (element != nullptr)
@@ -1860,7 +1863,7 @@ namespace tsl {
             /**
              * @brief Try to remove an item from the list
              * 
-             * @param index Index of element in list
+             * @param index Index of element in list. Call \ref Gui::removeFocus before.
              */
             virtual void removeIndex(size_t index) {
                 if (index < this->m_items.size()) {
@@ -1967,7 +1970,7 @@ namespace tsl {
 
             bool m_clearList = false;
             std::vector<Element *> m_itemsToRemove;
-            std::vector<std::pair<int, Element *>> m_itemsToAdd;
+            std::vector<std::pair<std::optional<size_t>, Element *>> m_itemsToAdd;
 
         private:
 
