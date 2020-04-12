@@ -44,6 +44,8 @@ public:
 
         list->addItem(clickableListItem);
         list->addItem(new tsl::elm::ListItem("Default List Item"));
+        list->addItem(new tsl::elm::ListItem("Default List Item with a long text to show scrolling behavior."));
+        list->addItem(new tsl::elm::ListItem("Scrolling text with a value next to it.", "Value"));
         list->addItem(new tsl::elm::ToggleListItem("Toggle List Item", true));
         
         // Custom Drawer, a element that gives direct access to the renderer

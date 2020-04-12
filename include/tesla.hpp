@@ -292,21 +292,6 @@ namespace tsl {
             return out;
         }
 
-        /**
-         * @brief Limit a strings length and end it with "…"
-         * 
-         * @param string String to truncate
-         * @param maxLength Maximum length of string
-         */
-        static std::string limitStringLength(std::string string, size_t maxLength) {
-            if (string.length() <= maxLength)
-                return string;
-
-            std::strcpy(&string[maxLength - 2], "…");
-
-            return string;
-        }
-
         namespace ini {
 
             /**
@@ -771,29 +756,22 @@ namespace tsl {
              * @param color Text color. Use transparent color to skip drawing and only get the string's dimensions
              * @return Dimensions of drawn string
              */
-            std::pair<u32, u32> drawString(const char* string, bool monospace, s32 x, s32 y, float fontSize, Color color, ssize_t maxWidth = 0, size_t* written = nullptr) {
-                const size_t stringLength = strlen(string);
-
+            std::pair<u32, u32> drawString(const char* string, bool monospace, s32 x, s32 y, float fontSize, Color color, ssize_t maxWidth = 0) {
                 s32 maxX = x;
                 s32 currX = x;
                 s32 currY = y;
-
-                u32 i = 0;
 
                 do {
                     if (maxWidth > 0 && maxWidth < (currX - x))
                         break;
 
-                    if (written != nullptr)
-                        *written += 1;
-
                     u32 currCharacter;
-                    ssize_t codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(string + i));
+                    ssize_t codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(string));
 
                     if (codepointWidth <= 0)
                         break;
 
-                    i += codepointWidth;
+                    string += codepointWidth;
 
                     stbtt_fontinfo *currFont = nullptr;
 
@@ -825,11 +803,56 @@ namespace tsl {
 
                     currX += static_cast<s32>(xAdvance * currFontSize);
 
-                } while (i < stringLength);
+                } while (*string != '\0');
 
                 maxX = std::max(currX, maxX);
 
                 return { maxX - x, currY - y };
+            }
+
+            /**
+             * @brief Limit a strings length and end it with "…"
+             * 
+             * @param string String to truncate
+             * @param maxLength Maximum length of string
+             */
+            std::string limitStringLength(std::string string, bool monospace, float fontSize, s32 maxLength) {
+                if (string.size() < 2)
+                    return string;
+
+                s32 currX = 0;
+                ssize_t strPos = 0;
+                ssize_t codepointWidth;
+
+                do {
+                    u32 currCharacter;
+                    codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(&string[strPos]));
+
+                    if (codepointWidth <= 0)
+                        break;
+
+                    strPos += codepointWidth;
+
+                    stbtt_fontinfo *currFont = nullptr;
+
+                    if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
+                        currFont = &this->m_extFont;
+                    else
+                        currFont = &this->m_stdFont;
+
+                    float currFontSize = stbtt_ScaleForPixelHeight(currFont, fontSize);
+
+                    int xAdvance = 0, yAdvance = 0;
+                    stbtt_GetCodepointHMetrics(currFont, monospace ? 'W' : currCharacter, &xAdvance, &yAdvance);
+
+                    currX += static_cast<s32>(xAdvance * currFontSize);
+
+                } while (string[strPos] != '\0' && string[strPos] != '\n' && currX < maxLength);
+
+                std::strcpy(&string[strPos - codepointWidth], "…");
+                string.shrink_to_fit();
+
+                return string;
             }
             
         private:
@@ -1985,46 +2008,44 @@ namespace tsl {
                         this->m_maxWidth = this->getWidth() - 40;
                     }
 
-                    size_t written = 0;
-                    renderer->drawString(this->m_text.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent, this->m_maxWidth, &written);
-                    this->m_trunctuated = written < this->m_text.length();
+                    auto [width, height] = renderer->drawString(this->m_text.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent);
+                    this->m_trunctuated = width > this->m_maxWidth;
 
                     if (this->m_trunctuated) {
-                        this->m_maxScroll = this->m_text.length() + 8;
-                        this->m_scrollText = this->m_text + "        " + this->m_text;
-                        this->m_ellipsisText = hlp::limitStringLength(this->m_text, written);
+                        this->m_scrollText = this->m_text + "        ";
+                        auto [width, height] = renderer->drawString(this->m_scrollText.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent);
+                        this->m_scrollText += this->m_text;
+                        this->m_textWidth = width;
+                        this->m_ellipsisText = renderer->limitStringLength(this->m_text, false, 23, this->m_maxWidth);
+                    } else {
+                        this->m_textWidth = width;
                     }
                 }
 
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
                 renderer->drawRect(this->getX(), ELEMENT_BOTTOM_BOUND(this), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
 
-                const char *text = m_text.c_str();
                 if (this->m_trunctuated) {
                     if (this->m_focused) {
-                        if (this->m_scroll) {
-                            if ((this->m_scrollAnimationCounter % 20) == 0) {
-                                this->m_scrollOffset++;
-                                if (this->m_scrollOffset >= this->m_maxScroll) {
-                                    this->m_scrollOffset = 0;
-                                    this->m_scroll = false;
-                                    this->m_scrollAnimationCounter = 0;
-                                }
-                            }
-                            text = this->m_scrollText.c_str() + this->m_scrollOffset;
-                        } else {
-                            if (this->m_scrollAnimationCounter > 60) {
-                                this->m_scroll = true;
+                        renderer->enableScissoring(this->getX(), this->getY(), this->m_maxWidth + 40, this->getHeight());
+                        renderer->drawString(this->m_scrollText.c_str(), false, this->getX() + 20 - this->m_scrollOffset, this->getY() + 45, 23, tsl::style::color::ColorText);
+                        renderer->disableScissoring();
+                        if (this->m_scrollAnimationCounter == 90) {
+                            if (this->m_scrollOffset == this->m_textWidth) {
+                                this->m_scrollOffset = 0;
                                 this->m_scrollAnimationCounter = 0;
+                            } else {
+                                this->m_scrollOffset++;
                             }
+                        } else {
+                            this->m_scrollAnimationCounter++;
                         }
-                        this->m_scrollAnimationCounter++;
                     } else {
-                        text = this->m_ellipsisText.c_str();
+                        renderer->drawString(this->m_ellipsisText.c_str(), false, this->getX() + 20, this->getY() + 45, 23, a(tsl::style::color::ColorText));
                     }
+                } else {
+                    renderer->drawString(this->m_text.c_str(), false, this->getX() + 20, this->getY() + 45, 23, a(tsl::style::color::ColorText));
                 }
-
-                renderer->drawString(text, false, this->getX() + 20, this->getY() + 45, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
 
                 renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 45, 20, this->m_faint ? a(tsl::style::color::ColorDescription) : a(tsl::style::color::ColorHighlight));
             }
@@ -2113,6 +2134,7 @@ namespace tsl {
             u16 m_maxScroll = 0;
             u16 m_scrollOffset = 0;
             u32 m_maxWidth = 0;
+            u32 m_textWidth = 0;
             u16 m_scrollAnimationCounter = 0;
         };
 
