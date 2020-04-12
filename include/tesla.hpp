@@ -1781,6 +1781,7 @@ namespace tsl {
                                 this->m_focusedIndex--;
                             }
                             this->invalidate();
+                            this->updateScrollOffset();
                             delete element;
                             break;
                         }
@@ -1982,6 +1983,19 @@ namespace tsl {
             }
 
             /**
+             * @brief Gets the item at the index in the list
+             * 
+             * @param index Index position in list
+             * @return Element from list. nullptr for if the index is out of bounds
+             */
+            virtual Element *getItemAtIndex(u32 index) {
+                if (this->m_items.size() <= index)
+                    return nullptr;
+
+                return this->m_items[index];
+            }
+
+            /**
              * @brief Gets the index in the list of the element passed in
              * 
              * @param element Element to check
@@ -1994,6 +2008,13 @@ namespace tsl {
                     return -1;
 
                 return it - this->m_items.begin();
+            }
+
+            virtual void setFocusedIndex(u32 index) {
+                if (this->m_items.size() > index) {
+                    m_focusedIndex = index;
+                    this->updateScrollOffset();
+                }
             }
 
         protected:
