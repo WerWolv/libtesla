@@ -55,16 +55,11 @@
 
 #define ELEMENT_BOUNDS(elem) elem->getX(), elem->getY(), elem->getWidth(), elem->getHeight()
 
-#define ELEMENT_TOP_BOUND(elem) (elem->getY())
-#define ELEMENT_LEFT_BOUND(elem) (elem->getX())
-#define ELEMENT_RIGHT_BOUND(elem) (elem->getX() + elem->getWidth())
-#define ELEMENT_BOTTOM_BOUND(elem) (elem->getY() + elem->getHeight())
-
 #define ASSERT_EXIT(x) if (R_FAILED(x)) std::exit(1)
 #define ASSERT_FATAL(x) if (Result res = x; R_FAILED(res)) fatalThrow(res)
 
 #define PACKED __attribute__((packed))
-#define ALWAYS_INLINE __attribute__((always_inline))
+#define ALWAYS_INLINE inline __attribute__((always_inline))
 
 /// Evaluates an expression that returns a result, and returns the result if it would fail.
 #define R_TRY(resultExpr)               \
@@ -966,7 +961,7 @@ namespace tsl {
              * @param y Y Pos
              * @return Offset
              */
-            const u32 getPixelOffset(s32 x, s32 y) {
+            u32 getPixelOffset(s32 x, s32 y) {
                 if (this->m_scissoring) {
                     if (x < this->m_currScissorConfig.x ||
                         y < this->m_currScissorConfig.y ||
@@ -1353,7 +1348,7 @@ namespace tsl {
              * @param width Width
              * @param height Height
              */
-            virtual void setBoundaries(s32 x, s32 y, s32 width, s32 height) final {
+            void setBoundaries(s32 x, s32 y, s32 width, s32 height) {
                 this->m_x = x;
                 this->m_y = y;
                 this->m_width = width;
@@ -1374,25 +1369,47 @@ namespace tsl {
              * 
              * @return X position
              */
-            virtual inline s32 getX() final { return this->m_x; }
+            inline s32 getX() { return this->m_x; }
             /**
              * @brief Gets the element's Y position
              * 
              * @return Y position
              */
-            virtual inline s32 getY() final { return this->m_y; }
+            inline s32 getY() { return this->m_y; }
             /**
              * @brief Gets the element's Width
              * 
              * @return Width
              */
-            virtual inline s32 getWidth()  final { return this->m_width;  }
+            inline s32 getWidth() { return this->m_width;  }
             /**
              * @brief Gets the element's Height
              * 
              * @return Height
              */
-            virtual inline s32 getHeight() final { return this->m_height; }
+            inline s32 getHeight() { return this->m_height; }
+
+            inline s32 getTopBound() { return this->getY(); }
+            inline s32 getLeftBound() { return this->getX(); }
+            inline s32 getRightBound() { return this->getX() + this->getWidth(); }
+            inline s32 getBottomBound() { return this->getY() + this->getHeight(); }
+
+            /**
+             * @brief Check if the coordinates are in the elements bounds
+             * 
+             * @return true if coordinates are in bounds, false otherwise
+             */
+            bool inBounds(s32 touchX, s32 touchY) {
+                return touchX >= this->getLeftBound() && touchX <= this->getRightBound() && touchY >= this->getTopBound() && touchY <= this->getBottomBound();
+            }
+            /**
+             * @brief Check if the coordinates are outside the elements bounds
+             * 
+             * @return true if coordinates are out of bounds, true otherwise
+             */
+            bool outOfBounds(s32 touchX, s32 touchY) {
+                return touchX < this->getLeftBound() || touchX > this->getRightBound() || touchY < this->getTopBound() || touchY > this->getBottomBound();
+            }
 
             /**
              * @brief Sets the element's parent
@@ -1400,14 +1417,14 @@ namespace tsl {
              * 
              * @param parent Parent
              */
-            virtual inline void setParent(Element *parent) final { this->m_parent = parent; }
+            inline void setParent(Element *parent) { this->m_parent = parent; }
 
             /**
              * @brief Get the element's parent
              * 
              * @return Parent
              */
-            virtual inline Element* getParent() final { return this->m_parent; }
+            inline Element* getParent() { return this->m_parent; }
 
             /**
              * @brief Marks this element as focused or unfocused to draw the highlight
@@ -1539,9 +1556,7 @@ namespace tsl {
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
                 // Discard touches outside bounds
-                if (currX < ELEMENT_LEFT_BOUND(this->m_contentElement) || currX > ELEMENT_RIGHT_BOUND(this->m_contentElement))
-                    return false;
-                if (currY < ELEMENT_TOP_BOUND(this->m_contentElement) || currY > ELEMENT_BOTTOM_BOUND(this->m_contentElement))
+                if (this->m_contentElement->outOfBounds(currX, currY))
                     return false;
 
                 if (this->m_contentElement != nullptr)
@@ -1636,9 +1651,7 @@ namespace tsl {
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
                 // Discard touches outside bounds
-                if (currX < ELEMENT_LEFT_BOUND(this->m_contentElement) || currX > ELEMENT_RIGHT_BOUND(this->m_contentElement))
-                    return false;
-                if (currY < ELEMENT_TOP_BOUND(this->m_contentElement) || currY > ELEMENT_BOTTOM_BOUND(this->m_contentElement))
+                if (this->m_contentElement->outOfBounds(currX, currY))
                     return false;
                 
                 if (this->m_contentElement != nullptr)
@@ -1775,10 +1788,10 @@ namespace tsl {
                 }
                 this->m_itemsToRemove.clear();
 
-                renderer->enableScissoring(ELEMENT_LEFT_BOUND(this), ELEMENT_TOP_BOUND(this) - 5, this->getWidth(), this->getHeight() + 4);
+                renderer->enableScissoring(this->getLeftBound(), this->getTopBound() - 5, this->getWidth(), this->getHeight() + 4);
 
                 for (auto &entry : this->m_items) {
-                    if (ELEMENT_BOTTOM_BOUND(entry) > ELEMENT_TOP_BOUND(this) && ELEMENT_TOP_BOUND(entry) < ELEMENT_BOTTOM_BOUND(this)) {
+                    if (entry->getBottomBound() > this->getTopBound() && entry->getTopBound() < this->getBottomBound()) {
                         entry->frame(renderer);
                     }
                 }
@@ -1789,9 +1802,9 @@ namespace tsl {
                     float scrollbarHeight = static_cast<float>(this->getHeight() * this->getHeight()) / this->m_listHeight;
                     float scrollbarOffset = (static_cast<double>(this->m_offset)) / static_cast<double>(this->m_listHeight - this->getHeight()) * (this->getHeight() - std::ceil(scrollbarHeight));
                     
-                    renderer->drawRect(ELEMENT_RIGHT_BOUND(this) + 10, this->getY() + scrollbarOffset, 5, scrollbarHeight - 50, a(tsl::style::color::ColorHandle));
-                    renderer->drawCircle(ELEMENT_RIGHT_BOUND(this) + 12, this->getY() + scrollbarOffset, 2, true, a(tsl::style::color::ColorHandle));
-                    renderer->drawCircle(ELEMENT_RIGHT_BOUND(this) + 12, this->getY() + scrollbarOffset + scrollbarHeight - 50, 2, true, a(tsl::style::color::ColorHandle));
+                    renderer->drawRect(this->getRightBound() + 10, this->getY() + scrollbarOffset, 5, scrollbarHeight - 50, a(tsl::style::color::ColorHandle));
+                    renderer->drawCircle(this->getRightBound() + 12, this->getY() + scrollbarOffset, 2, true, a(tsl::style::color::ColorHandle));
+                    renderer->drawCircle(this->getRightBound() + 12, this->getY() + scrollbarOffset + scrollbarHeight - 50, 2, true, a(tsl::style::color::ColorHandle));
                     
                     float prevOffset = this->m_offset;
 
@@ -1824,9 +1837,7 @@ namespace tsl {
                 bool handled = false;
 
                 // Discard touches out of bounds
-                if (currX < ELEMENT_LEFT_BOUND(this) || currX > ELEMENT_RIGHT_BOUND(this))
-                    return false;
-                if (currY < ELEMENT_TOP_BOUND(this) || currY > ELEMENT_BOTTOM_BOUND(this))
+                if (this->outOfBounds(currX, currY))
                     return false;
 
                 // Direct touches to all children
@@ -2067,7 +2078,7 @@ namespace tsl {
                 }
 
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
-                renderer->drawRect(this->getX(), ELEMENT_BOTTOM_BOUND(this), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX(), this->getTopBound(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
 
                 if (this->m_trunctuated) {
                     if (this->m_focused) {
@@ -2110,7 +2121,7 @@ namespace tsl {
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
                 if (event == TouchEvent::Touch)
-                    this->m_touched = currX > ELEMENT_LEFT_BOUND(this) && currX < (ELEMENT_RIGHT_BOUND(this)) && currY > ELEMENT_TOP_BOUND(this) && currY < (ELEMENT_BOTTOM_BOUND(this));
+                    this->m_touched = this->inBounds(currX, currY);
                 
                 if (event == TouchEvent::Release && this->m_touched) {
                     this->m_touched = false;
@@ -2144,7 +2155,7 @@ namespace tsl {
              * 
              * @param text Text
              */
-            virtual inline void setText(const std::string& text) {
+            inline void setText(const std::string& text) {
                 this->m_text = text;
                 this->m_scrollText = "";
                 this->m_ellipsisText = "";
@@ -2157,10 +2168,28 @@ namespace tsl {
              * @param value Text
              * @param faint Should the text be drawn in a glowing green or a faint gray
              */
-            virtual inline void setValue(const std::string& value, bool faint = false) {
+            inline void setValue(const std::string& value, bool faint = false) {
                 this->m_value = value;
                 this->m_faint = faint;
                 this->m_maxWidth = 0;
+            }
+
+            /**
+             * @brief Gets the left hand description text of the list item
+             * 
+             * @return Text
+             */
+            inline const std::string &getText() const {
+                return this->m_text;
+            }
+
+            /**
+             * @brief Gets the right hand value text of the list item
+             * 
+             * @return Value
+             */
+            inline const std::string &getValue() {
+                return this->m_value;
             }
 
         protected:
@@ -2256,17 +2285,17 @@ namespace tsl {
             std::function<void(bool)> m_stateChangedListener = [](bool){};
         };
 
-        class CategoryHeader : public ListItem {
+        class CategoryHeader : public Element {
         public:
-            CategoryHeader(const std::string &title, bool hasSeparator = false) : ListItem(title), m_hasSeparator(hasSeparator) {}
+            CategoryHeader(const std::string &title, bool hasSeparator = false) : m_text(title), m_hasSeparator(hasSeparator) {}
             virtual ~CategoryHeader() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->drawRect(this->getX() - 2, ELEMENT_BOTTOM_BOUND(this) - 30, 5, 23, a(tsl::style::color::ColorHeaderBar));
-                renderer->drawString(this->m_text.c_str(), false, this->getX() + 13, ELEMENT_BOTTOM_BOUND(this) - 12, 15, a(tsl::style::color::ColorText));
+                renderer->drawRect(this->getX() - 2, this->getBottomBound() - 30, 5, 23, a(tsl::style::color::ColorHeaderBar));
+                renderer->drawString(this->m_text.c_str(), false, this->getX() + 13, this->getBottomBound() - 12, 15, a(tsl::style::color::ColorText));
 
                 if (this->m_hasSeparator)
-                    renderer->drawRect(this->getX(), ELEMENT_BOTTOM_BOUND(this), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
+                    renderer->drawRect(this->getX(), this->getBottomBound(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
             }
 
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {
@@ -2290,6 +2319,7 @@ namespace tsl {
             }
 
         private:
+            std::string m_text;
             bool m_hasSeparator;
         };
 
@@ -2297,16 +2327,20 @@ namespace tsl {
          * @brief A customizable analog trackbar going from 0% to 100% (like the brightness slider)
          * 
          */
-        class TrackBar : public ListItem {
+        class TrackBar : public Element {
         public:
             /**
              * @brief Constructor
              * 
              * @param icon Icon shown next to the track bar
              */
-            TrackBar(const char icon[3]) : ListItem(icon), m_icon(icon) { }
+            TrackBar(const char icon[3]) : m_icon(icon) { }
 
             virtual ~TrackBar() {}
+
+            virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) {
+                return this;
+            }
 
             virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
                 if (keysHeld & KEY_LEFT && keysHeld & KEY_RIGHT)
@@ -2338,8 +2372,8 @@ namespace tsl {
                 }
                 
 
-                if (!this->m_interactionLocked && initialX > ELEMENT_LEFT_BOUND(this) && initialX < (ELEMENT_RIGHT_BOUND(this)) && initialY > ELEMENT_TOP_BOUND(this) && initialY < ELEMENT_BOTTOM_BOUND(this)) {
-                    if (currX > ELEMENT_LEFT_BOUND(this) + 50 && currX < ELEMENT_RIGHT_BOUND(this) && currY > ELEMENT_TOP_BOUND(this) && currY < ELEMENT_BOTTOM_BOUND(this)) {
+                if (!this->m_interactionLocked && this->inBounds(initialX, initialY)) {
+                    if (currX > this->getLeftBound() + 50 && currX < this->getRightBound() && currY > this->getTopBound() && currY < this->getBottomBound()) {
                         s16 newValue = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
 
                         if (newValue < 0) {
@@ -2364,9 +2398,9 @@ namespace tsl {
 
             virtual void draw(gfx::Renderer *renderer) override {
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
-                renderer->drawRect(this->getX(), ELEMENT_BOTTOM_BOUND(this), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
+                renderer->drawRect(this->getX(), this->getBottomBound(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
 
-                renderer->drawString(this->m_icon, false, this->getX() + 15, this->getY() + 50, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
+                renderer->drawString(this->m_icon, false, this->getX() + 15, this->getY() + 50, 23, a(tsl::style::color::ColorText));
 
                 u16 handlePos = (this->getWidth() - 95) * static_cast<float>(this->m_value) / 100;
                 renderer->drawCircle(this->getX() + 60, this->getY() + 42, 2, true, a(tsl::style::color::ColorHighlight));
@@ -2468,10 +2502,6 @@ namespace tsl {
             bool m_interactionLocked = false;
 
             std::function<void(u8)> m_valueChangedListener = [](u8){};
-
-        private:
-            virtual inline void setText(const std::string& text) {}
-            virtual inline void setValue(const std::string& value, bool faint = false) {}
         };
 
 
@@ -2521,8 +2551,8 @@ namespace tsl {
             }
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) override {
-                if (initialX > ELEMENT_LEFT_BOUND(this) && initialX < ELEMENT_RIGHT_BOUND(this) && initialY > ELEMENT_TOP_BOUND(this) && initialY < ELEMENT_BOTTOM_BOUND(this)) {
-                    if (currY > ELEMENT_TOP_BOUND(this) && currY < ELEMENT_BOTTOM_BOUND(this)) {
+                if (this->inBounds(initialX, initialY)) {
+                    if (currY > this->getTopBound() && currY < this->getBottomBound()) {
                         s16 newValue = (static_cast<float>(currX - (this->getX() + 60)) / static_cast<float>(this->getWidth() - 95)) * 100;
 
                         if (newValue < 0) {
@@ -3003,7 +3033,8 @@ namespace tsl {
 
             if (currentFocus == nullptr) {
                 if (keysDown & KEY_B) {
-                    this->goBack();
+                    if (!currentGui->handleInput(KEY_B, 0,{},{},{}))
+                        this->goBack();
                     return;
                 }
 
