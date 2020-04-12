@@ -292,21 +292,6 @@ namespace tsl {
             return out;
         }
 
-        /**
-         * @brief Limit a strings length and end it with "…"
-         * 
-         * @param string String to truncate
-         * @param maxLength Maximum length of string
-         */
-        static std::string limitStringLength(std::string string, size_t maxLength) {
-            if (string.length() <= maxLength)
-                return string;
-
-            std::strcpy(&string[maxLength - 2], "…");
-
-            return string;
-        }
-
         namespace ini {
 
             /**
@@ -771,29 +756,22 @@ namespace tsl {
              * @param color Text color. Use transparent color to skip drawing and only get the string's dimensions
              * @return Dimensions of drawn string
              */
-            std::pair<u32, u32> drawString(const char* string, bool monospace, s32 x, s32 y, float fontSize, Color color, ssize_t maxWidth = 0, size_t* written = nullptr) {
-                const size_t stringLength = strlen(string);
-
+            std::pair<u32, u32> drawString(const char* string, bool monospace, s32 x, s32 y, float fontSize, Color color, ssize_t maxWidth = 0) {
                 s32 maxX = x;
                 s32 currX = x;
                 s32 currY = y;
-
-                u32 i = 0;
 
                 do {
                     if (maxWidth > 0 && maxWidth < (currX - x))
                         break;
 
-                    if (written != nullptr)
-                        *written += 1;
-
                     u32 currCharacter;
-                    ssize_t codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(string + i));
+                    ssize_t codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(string));
 
                     if (codepointWidth <= 0)
                         break;
 
-                    i += codepointWidth;
+                    string += codepointWidth;
 
                     stbtt_fontinfo *currFont = nullptr;
 
@@ -823,13 +801,58 @@ namespace tsl {
                    if (!std::iswspace(currCharacter) && fontSize > 0 && color.a != 0x0)
                         this->drawGlyph(currCharacter, currX + bounds[0], currY + bounds[1], color, currFont, currFontSize);
 
-                    currX += xAdvance * currFontSize;
+                    currX += static_cast<s32>(xAdvance * currFontSize);
 
-                } while (i < stringLength);
+                } while (*string != '\0');
 
                 maxX = std::max(currX, maxX);
 
                 return { maxX - x, currY - y };
+            }
+
+            /**
+             * @brief Limit a strings length and end it with "…"
+             * 
+             * @param string String to truncate
+             * @param maxLength Maximum length of string
+             */
+            std::string limitStringLength(std::string string, bool monospace, float fontSize, s32 maxLength) {
+                if (string.size() < 2)
+                    return string;
+
+                s32 currX = 0;
+                ssize_t strPos = 0;
+                ssize_t codepointWidth;
+
+                do {
+                    u32 currCharacter;
+                    codepointWidth = decode_utf8(&currCharacter, reinterpret_cast<const u8*>(&string[strPos]));
+
+                    if (codepointWidth <= 0)
+                        break;
+
+                    strPos += codepointWidth;
+
+                    stbtt_fontinfo *currFont = nullptr;
+
+                    if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
+                        currFont = &this->m_extFont;
+                    else
+                        currFont = &this->m_stdFont;
+
+                    float currFontSize = stbtt_ScaleForPixelHeight(currFont, fontSize);
+
+                    int xAdvance = 0, yAdvance = 0;
+                    stbtt_GetCodepointHMetrics(currFont, monospace ? 'W' : currCharacter, &xAdvance, &yAdvance);
+
+                    currX += static_cast<s32>(xAdvance * currFontSize);
+
+                } while (string[strPos] != '\0' && string[strPos] != '\n' && currX < maxLength);
+
+                std::strcpy(&string[strPos - codepointWidth], "…");
+                string.shrink_to_fit();
+
+                return string;
             }
             
         private:
@@ -1724,13 +1747,33 @@ namespace tsl {
                     this->m_clearList = false;
                 }
 
-                for (auto &element : this->m_itemsToAdd) {
+                for (auto [index, element] : this->m_itemsToAdd) {
                     element->invalidate();
-                    this->m_items.push_back(element);
+                    if (index.has_value() && (this->m_items.size() > index.value())) {
+                        const auto& it = this->m_items.cbegin() + index.value();
+                        this->m_items.insert(it, element);
+                    } else {
+                        this->m_items.push_back(element);
+                    }
                     this->invalidate();
                     this->updateScrollOffset();
                 }
                 this->m_itemsToAdd.clear();
+
+                for (auto element : this->m_itemsToRemove) {
+                    for (auto it = m_items.cbegin(); it != m_items.cend(); ++it) {
+                        if (*it == element) {
+                            this->m_items.erase(it);
+                            if (this->m_focusedIndex >= (it - this->m_items.cbegin())) {
+                                this->m_focusedIndex--;
+                            }
+                            this->invalidate();
+                            delete element;
+                            break;
+                        }
+                    }
+                }
+                this->m_itemsToRemove.clear();
 
                 renderer->enableScissoring(ELEMENT_LEFT_BOUND(this), ELEMENT_TOP_BOUND(this) - 5, this->getWidth(), this->getHeight() + 4);
 
@@ -1814,9 +1857,10 @@ namespace tsl {
              * @brief Adds a new item to the list before the next frame starts
              * 
              * @param element Element to add
+             * @param index Index in the list where the item should be inserted. -1 or greater list size will insert it at the end
              * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
              */
-            virtual void addItem(Element *element, u16 height = 0) final {
+            virtual void addItem(Element *element, std::optional<size_t> index = {}, u16 height = 0) final {
                 if (element != nullptr) {
                     if (height != 0)
                         element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
@@ -1824,9 +1868,31 @@ namespace tsl {
                     element->setParent(this);
                     element->invalidate();
 
-                    this->m_itemsToAdd.push_back(element);
+                    this->m_itemsToAdd.emplace_back(index, element);
                 }
 
+            }
+
+            /**
+             * @brief Removes an item form the list and deletes it
+             * @note Item will only be deleted if it was found in the list
+             * 
+             * @param element Element to remove from list. Call \ref Gui::removeFocus before.
+             */
+            virtual void removeItem(Element *element) {
+                if (element != nullptr)
+                    this->m_itemsToRemove.emplace_back(element);
+            }
+
+            /**
+             * @brief Try to remove an item from the list
+             * 
+             * @param index Index of element in list. Call \ref Gui::removeFocus before.
+             */
+            virtual void removeIndex(size_t index) {
+                if (index < this->m_items.size()) {
+                    removeItem(this->m_items[index]);
+                }
             }
 
             /**
@@ -1927,7 +1993,8 @@ namespace tsl {
             s32 m_listHeight = 0;
 
             bool m_clearList = false;
-            std::vector<Element *> m_itemsToAdd;
+            std::vector<Element *> m_itemsToRemove;
+            std::vector<std::pair<std::optional<size_t>, Element *>> m_itemsToAdd;
 
         private:
 
@@ -1985,46 +2052,44 @@ namespace tsl {
                         this->m_maxWidth = this->getWidth() - 40;
                     }
 
-                    size_t written = 0;
-                    renderer->drawString(this->m_text.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent, this->m_maxWidth, &written);
-                    this->m_trunctuated = written < this->m_text.length();
+                    auto [width, height] = renderer->drawString(this->m_text.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent);
+                    this->m_trunctuated = width > this->m_maxWidth;
 
                     if (this->m_trunctuated) {
-                        this->m_maxScroll = this->m_text.length() + 8;
-                        this->m_scrollText = this->m_text + "        " + this->m_text;
-                        this->m_ellipsisText = hlp::limitStringLength(this->m_text, written);
+                        this->m_scrollText = this->m_text + "        ";
+                        auto [width, height] = renderer->drawString(this->m_scrollText.c_str(), false, 0, 0, 23, tsl::style::color::ColorTransparent);
+                        this->m_scrollText += this->m_text;
+                        this->m_textWidth = width;
+                        this->m_ellipsisText = renderer->limitStringLength(this->m_text, false, 23, this->m_maxWidth);
+                    } else {
+                        this->m_textWidth = width;
                     }
                 }
 
                 renderer->drawRect(this->getX(), this->getY(), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
                 renderer->drawRect(this->getX(), ELEMENT_BOTTOM_BOUND(this), this->getWidth(), 1, a(tsl::style::color::ColorFrame));
 
-                const char *text = m_text.c_str();
                 if (this->m_trunctuated) {
                     if (this->m_focused) {
-                        if (this->m_scroll) {
-                            if ((this->m_scrollAnimationCounter % 20) == 0) {
-                                this->m_scrollOffset++;
-                                if (this->m_scrollOffset >= this->m_maxScroll) {
-                                    this->m_scrollOffset = 0;
-                                    this->m_scroll = false;
-                                    this->m_scrollAnimationCounter = 0;
-                                }
-                            }
-                            text = this->m_scrollText.c_str() + this->m_scrollOffset;
-                        } else {
-                            if (this->m_scrollAnimationCounter > 60) {
-                                this->m_scroll = true;
+                        renderer->enableScissoring(this->getX(), this->getY(), this->m_maxWidth + 40, this->getHeight());
+                        renderer->drawString(this->m_scrollText.c_str(), false, this->getX() + 20 - this->m_scrollOffset, this->getY() + 45, 23, tsl::style::color::ColorText);
+                        renderer->disableScissoring();
+                        if (this->m_scrollAnimationCounter == 90) {
+                            if (this->m_scrollOffset == this->m_textWidth) {
+                                this->m_scrollOffset = 0;
                                 this->m_scrollAnimationCounter = 0;
+                            } else {
+                                this->m_scrollOffset++;
                             }
+                        } else {
+                            this->m_scrollAnimationCounter++;
                         }
-                        this->m_scrollAnimationCounter++;
                     } else {
-                        text = this->m_ellipsisText.c_str();
+                        renderer->drawString(this->m_ellipsisText.c_str(), false, this->getX() + 20, this->getY() + 45, 23, a(tsl::style::color::ColorText));
                     }
+                } else {
+                    renderer->drawString(this->m_text.c_str(), false, this->getX() + 20, this->getY() + 45, 23, a(tsl::style::color::ColorText));
                 }
-
-                renderer->drawString(text, false, this->getX() + 20, this->getY() + 45, 23, a(tsl::style::color::ColorText), this->m_maxWidth);
 
                 renderer->drawString(this->m_value.c_str(), false, this->getX() + this->m_maxWidth + 45, this->getY() + 45, 20, this->m_faint ? a(tsl::style::color::ColorDescription) : a(tsl::style::color::ColorHighlight));
             }
@@ -2113,6 +2178,7 @@ namespace tsl {
             u16 m_maxScroll = 0;
             u16 m_scrollOffset = 0;
             u32 m_maxWidth = 0;
+            u32 m_textWidth = 0;
             u16 m_scrollAnimationCounter = 0;
         };
 
