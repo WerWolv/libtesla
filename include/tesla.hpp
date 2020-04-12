@@ -823,7 +823,7 @@ namespace tsl {
                    if (!std::iswspace(currCharacter) && fontSize > 0 && color.a != 0x0)
                         this->drawGlyph(currCharacter, currX + bounds[0], currY + bounds[1], color, currFont, currFontSize);
 
-                    currX += xAdvance * currFontSize;
+                    currX += static_cast<s32>(xAdvance * currFontSize);
 
                 } while (i < stringLength);
 
