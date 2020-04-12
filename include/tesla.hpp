@@ -1738,10 +1738,10 @@ namespace tsl {
                 this->m_itemsToAdd.clear();
 
                 for (auto element : this->m_itemsToRemove) {
-                    for (size_t i = 0; i < this->m_items.size(); i++) {
-                        if (this->m_items[i] == element) {
-                            this->m_items.erase(this->m_items.cbegin() + i);
-                            if (this->m_focusedIndex >= i) {
+                    for (auto it = m_items.cbegin(); it != m_items.cend(); ++it) {
+                        if (*it == element) {
+                            this->m_items.erase(it);
+                            if (this->m_focusedIndex >= (it - this->m_items.cbegin())) {
                                 this->m_focusedIndex--;
                             }
                             this->invalidate();
