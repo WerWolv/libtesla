@@ -3160,7 +3160,8 @@ namespace tsl {
             } else {
                 if (oldTouchPos.px < 150U && oldTouchPos.py > cfg::FramebufferHeight - 73U)
                     if (initialTouchPos.px < 150U && initialTouchPos.py > cfg::FramebufferHeight - 73U)
-                        this->goBack();
+                        if (!currentGui->handleInput(KEY_B, 0,{},{},{}))
+                            this->goBack();
 
                 elm::Element::setInputMode(InputMode::Controller);
 
