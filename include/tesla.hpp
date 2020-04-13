@@ -1431,7 +1431,10 @@ namespace tsl {
              * 
              * @param focused Focused
              */
-            virtual inline void setFocused(bool focused) { this->m_focused = focused; }
+            virtual inline void setFocused(bool focused) {
+                this->m_focused = focused;
+                this->m_clickAnimationProgress = 0;
+            }
 
 
             static InputMode getInputMode() { return Element::s_inputMode; }
@@ -2164,7 +2167,7 @@ namespace tsl {
                 this->m_scroll = false;
                 this->m_scrollOffset = 0;
                 this->m_scrollAnimationCounter = 0;
-                this->m_focused = state;
+                Element::setFocused(state);
             }
 
             virtual Element* requestFocus(Element *oldFocus, FocusDirection direction) override {
