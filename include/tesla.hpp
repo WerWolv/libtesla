@@ -89,7 +89,8 @@ namespace tsl {
         extern u16 FramebufferWidth;            ///< Width of the framebuffer
         extern u16 FramebufferHeight;           ///< Height of the framebuffer
         extern u64 launchCombo;                 ///< Overlay activation key combo
-        extern u64 captureCombo;                ///< Overlay activation key combo
+        extern u64 captureCombo;                ///< Screenshot key combo
+        extern bool captureComboEnabled;        ///< Screenshot enabled
 
     }
 
@@ -467,6 +468,10 @@ namespace tsl {
                 writeOverlaySettings(iniData);
             }
 
+        }
+
+        static bool stringToBool(const std::string &value) {
+            return (value == "true") || (value == "1");
         }
 
         /**
@@ -3334,14 +3339,19 @@ namespace tsl {
         /**
          * @brief Extract values from Tesla settings file
          * 
-         * @param[out] keyCombo Overlay launch button combo
          */
-        static void parseOverlaySettings(u64 &keyCombo) {
+        static void parseOverlaySettings() {
             hlp::ini::IniData parsedConfig = hlp::ini::readOverlaySettings();
 
             u64 decodedKeys = hlp::comboStringToKeys(parsedConfig["tesla"]["key_combo"]);
             if (decodedKeys)
-                keyCombo = decodedKeys;
+                tsl::cfg::launchCombo = decodedKeys;
+
+            decodedKeys = hlp::comboStringToKeys(parsedConfig["tesla"]["screenshot_combo"]);
+            if (decodedKeys)
+                tsl::cfg::captureCombo = decodedKeys;
+
+            tsl::cfg::captureComboEnabled = hlp::stringToBool(parsedConfig["tesla"]["screenshot_combo_enabled"]);
         }
 
         /**
@@ -3369,7 +3379,7 @@ namespace tsl {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
             // Parse Tesla settings
-            impl::parseOverlaySettings(tsl::cfg::launchCombo);
+            impl::parseOverlaySettings();
 
             // Drop all inputs from the previous overlay
             hidScanInput();
@@ -3441,7 +3451,7 @@ namespace tsl {
                             eventFire(&shData->comboEvent);
                     }
 
-                    if (((shData->keysHeld & tsl::cfg::captureCombo) == tsl::cfg::captureCombo) && shData->keysDown & tsl::cfg::captureCombo) {
+                    if (shData->overlayOpen && tsl::cfg::captureComboEnabled && ((shData->keysHeld & tsl::cfg::captureCombo) == tsl::cfg::captureCombo) && shData->keysDown & tsl::cfg::captureCombo) {
                         tsl::hlp::captureScreen();
                     }
 
@@ -3659,6 +3669,7 @@ namespace tsl::cfg {
     u16 FramebufferHeight = 0;
     u64 launchCombo = KEY_L | KEY_DDOWN | KEY_RSTICK;
     u64 captureCombo = KEY_PLUS | KEY_MINUS;
+    bool captureComboEnabled = false;
 }
 
 extern "C" {
