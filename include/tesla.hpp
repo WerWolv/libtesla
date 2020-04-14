@@ -1815,8 +1815,8 @@ namespace tsl {
 
                 for (auto [index, element] : this->m_itemsToAdd) {
                     element->invalidate();
-                    if (index.has_value() && (this->m_items.size() > index.value())) {
-                        const auto& it = this->m_items.cbegin() + index.value();
+                    if (index >= 0 && (this->m_items.size() > static_cast<size_t>(index))) {
+                        const auto& it = this->m_items.cbegin() + static_cast<size_t>(index);
                         this->m_items.insert(it, element);
                     } else {
                         this->m_items.push_back(element);
@@ -1925,7 +1925,7 @@ namespace tsl {
              * @param index Index in the list where the item should be inserted. -1 or greater list size will insert it at the end
              * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
              */
-            virtual void addItem(Element *element, std::optional<size_t> index = {}, u16 height = 0) final {
+            virtual void addItem(Element *element, ssize_t index = -1, u16 height = 0) final {
                 if (element != nullptr) {
                     if (height != 0)
                         element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
@@ -1935,7 +1935,6 @@ namespace tsl {
 
                     this->m_itemsToAdd.emplace_back(index, element);
                 }
-
             }
 
             /**
@@ -1955,9 +1954,8 @@ namespace tsl {
              * @param index Index of element in list. Call \ref Gui::removeFocus before.
              */
             virtual void removeIndex(size_t index) {
-                if (index < this->m_items.size()) {
+                if (index < this->m_items.size())
                     removeItem(this->m_items[index]);
-                }
             }
 
             /**
@@ -2041,7 +2039,7 @@ namespace tsl {
              * @param index Index position in list
              * @return Element from list. nullptr for if the index is out of bounds
              */
-            virtual Element *getItemAtIndex(u32 index) {
+            virtual Element* getItemAtIndex(u32 index) {
                 if (this->m_items.size() <= index)
                     return nullptr;
 
@@ -2079,7 +2077,7 @@ namespace tsl {
 
             bool m_clearList = false;
             std::vector<Element *> m_itemsToRemove;
-            std::vector<std::pair<std::optional<size_t>, Element *>> m_itemsToAdd;
+            std::vector<std::pair<ssize_t, Element *>> m_itemsToAdd;
 
         private:
 
@@ -2253,7 +2251,7 @@ namespace tsl {
              * 
              * @return Text
              */
-            inline const std::string &getText() const {
+            inline const std::string& getText() const {
                 return this->m_text;
             }
 
@@ -2262,7 +2260,7 @@ namespace tsl {
              * 
              * @return Value
              */
-            inline const std::string &getValue() {
+            inline const std::string& getValue() {
                 return this->m_value;
             }
 
