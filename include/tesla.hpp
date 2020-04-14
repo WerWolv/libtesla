@@ -167,7 +167,7 @@ namespace tsl {
          * 
          * Ordered as they should be displayed
          */
-        static const std::list<KeyInfo> KEYS_INFO = {
+        static const std::vector<KeyInfo> KEYS_INFO = {
             { KEY_L, "L", "\uE0A4" }, { KEY_R, "R", "\uE0A5" },
             { KEY_ZL, "ZL", "\uE0A6" }, { KEY_ZR, "ZR", "\uE0A7" },
             { KEY_SL, "SL", "\uE0A8" }, { KEY_SR, "SR", "\uE0A9" },
@@ -190,48 +190,6 @@ namespace tsl {
 
     namespace hlp {
 
-        /**
-         * @brief Capture the whole screen with overlays
-         * 
-         */
-        static void captureScreen() {
-            u64 size;
-            size_t buffer_size = 0x7D000;
-            u8 *buffer = new u8[buffer_size];
-            struct {
-                u32 a;
-                u64 b;
-            } in = {0, 10000000000};
-            Result rc = serviceDispatchInOut(capsscGetServiceSession(), 1204, in, size,
-                .buffer_attrs = {SfBufferAttr_HipcMapTransferAllowsNonSecure | SfBufferAttr_HipcMapAlias | SfBufferAttr_Out},
-                .buffers = { { buffer, buffer_size } },
-            );
-            if (R_SUCCEEDED(rc)) {
-                FsFileSystem sdmc;
-                rc = fsOpenSdCardFileSystem(&sdmc);
-                if (R_SUCCEEDED(rc)) {
-                    char *pathBuffer = new char[FS_MAX_PATH];
-                    u64 timestamp=0;
-                    Result rc = timeGetCurrentTime(TimeType_Default, &timestamp);
-                    if (R_SUCCEEDED(rc)) std::snprintf(pathBuffer, FS_MAX_PATH, "/libtesla_%ld.jpg", timestamp);
-                    else std::strcpy(pathBuffer, "/libtesla_screenshot.jpg");
-                    fsFsDeleteFile(&sdmc, pathBuffer);
-                    rc = fsFsCreateFile(&sdmc, pathBuffer, size, 0);
-                    if (R_SUCCEEDED(rc)) {
-                        FsFile file;
-                        rc = fsFsOpenFile(&sdmc, pathBuffer, FsOpenMode_Write, &file);
-                        if (R_SUCCEEDED(rc)) {
-                            fsFileWrite(&file, 0, buffer, size, FsWriteOption_Flush);
-                            fsFileClose(&file);
-                        }
-                    }
-                    delete[] pathBuffer;
-                    fsFsClose(&sdmc);
-                }
-            }
-            delete[] buffer;
-        }
-        
         /**
          * @brief Wrapper for service initialization
          * 
@@ -270,6 +228,55 @@ namespace tsl {
                 ALWAYS_INLINE ~ScopeGuard() { if (f) { f(); } }
                 void dismiss() { f = nullptr; }
         };
+
+        /**
+         * @brief Capture the whole screen with overlays
+         * @note this allocates 0x7D301 bytes of heap memory so make sure you have that.
+         * 
+         * @return Result Result
+         */
+        static Result captureScreen() {
+            /* Allocate buffer for jpeg. */
+            size_t buffer_size = 0x7D000;
+            u8 *buffer = new u8[buffer_size];
+            ScopeGuard buffer_guard([buffer] { delete[] buffer; });
+
+            /* Capture current screen. */
+            u64 size;
+            struct {
+                u32 a;
+                u64 b;
+            } in = {0, 10000000000};
+            R_TRY(serviceDispatchInOut(capsscGetServiceSession(), 1204, in, size,
+                .buffer_attrs = {SfBufferAttr_HipcMapTransferAllowsNonSecure | SfBufferAttr_HipcMapAlias | SfBufferAttr_Out},
+                .buffers = { { buffer, buffer_size } },
+            ));
+
+            /* Open Sd card filesystem. */
+            FsFileSystem sdmc;
+            R_TRY(fsOpenSdCardFileSystem(&sdmc));
+            ScopeGuard sdmc_guard([&sdmc] { fsFsClose(&sdmc); });
+
+            /* Allocate path buffer. */
+            char *pathBuffer = new char[FS_MAX_PATH];
+            ScopeGuard path_guard([pathBuffer] { delete[] pathBuffer; });
+
+            /* Get unique filepath. */
+            u64 timestamp=0;
+            Result rc = timeGetCurrentTime(TimeType_Default, &timestamp);
+            if (R_SUCCEEDED(rc)) std::snprintf(pathBuffer, FS_MAX_PATH, "/libtesla_%ld.jpg", timestamp);
+            else std::strcpy(pathBuffer, "/libtesla_screenshot.jpg");
+
+            /* Create file, open and write to it. */
+            fsFsDeleteFile(&sdmc, pathBuffer);
+            R_TRY(fsFsCreateFile(&sdmc, pathBuffer, size, 0));
+            FsFile file;
+            R_TRY(fsFsOpenFile(&sdmc, pathBuffer, FsOpenMode_Write, &file));
+            fsFileWrite(&file, 0, buffer, size, FsWriteOption_Flush);
+            fsFileClose(&file);
+
+            return 0;
+        }
 
         /**
          * @brief libnx hid:sys shim that gives or takes away frocus to or from the process with the given aruid
