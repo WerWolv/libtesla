@@ -1457,14 +1457,6 @@ namespace tsl {
             bool inBounds(s32 touchX, s32 touchY) {
                 return touchX >= this->getLeftBound() && touchX <= this->getRightBound() && touchY >= this->getTopBound() && touchY <= this->getBottomBound();
             }
-            /**
-             * @brief Check if the coordinates are outside the elements bounds
-             * 
-             * @return true if coordinates are out of bounds, true otherwise
-             */
-            bool outOfBounds(s32 touchX, s32 touchY) {
-                return touchX < this->getLeftBound() || touchX > this->getRightBound() || touchY < this->getTopBound() || touchY > this->getBottomBound();
-            }
 
             /**
              * @brief Sets the element's parent
@@ -1614,7 +1606,7 @@ namespace tsl {
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
                 // Discard touches outside bounds
-                if (this->m_contentElement->outOfBounds(currX, currY))
+                if (!this->m_contentElement->inBounds(currX, currY))
                     return false;
 
                 if (this->m_contentElement != nullptr)
@@ -1709,7 +1701,7 @@ namespace tsl {
 
             virtual bool onTouch(TouchEvent event, s32 currX, s32 currY, s32 prevX, s32 prevY, s32 initialX, s32 initialY) {
                 // Discard touches outside bounds
-                if (this->m_contentElement->outOfBounds(currX, currY))
+                if (!this->m_contentElement->inBounds(currX, currY))
                     return false;
                 
                 if (this->m_contentElement != nullptr)
@@ -1896,7 +1888,7 @@ namespace tsl {
                 bool handled = false;
 
                 // Discard touches out of bounds
-                if (this->outOfBounds(currX, currY))
+                if (!this->inBounds(currX, currY))
                     return false;
 
                 // Direct touches to all children
