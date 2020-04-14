@@ -89,6 +89,7 @@ namespace tsl {
         extern u16 FramebufferWidth;            ///< Width of the framebuffer
         extern u16 FramebufferHeight;           ///< Height of the framebuffer
         extern u64 launchCombo;                 ///< Overlay activation key combo
+        extern u64 captureCombo;                ///< Overlay activation key combo
 
     }
 
@@ -188,6 +189,48 @@ namespace tsl {
     // Helpers
 
     namespace hlp {
+
+        /**
+         * @brief Capture the whole screen with overlays
+         * 
+         */
+        static void captureScreen() {
+            u64 size;
+            size_t buffer_size = 0x7D000;
+            u8 *buffer = new u8[buffer_size];
+            struct {
+                u32 a;
+                u64 b;
+            } in = {0, 10000000000};
+            Result rc = serviceDispatchInOut(capsscGetServiceSession(), 1204, in, size,
+                .buffer_attrs = {SfBufferAttr_HipcMapTransferAllowsNonSecure | SfBufferAttr_HipcMapAlias | SfBufferAttr_Out},
+                .buffers = { { buffer, buffer_size } },
+            );
+            if (R_SUCCEEDED(rc)) {
+                FsFileSystem sdmc;
+                rc = fsOpenSdCardFileSystem(&sdmc);
+                if (R_SUCCEEDED(rc)) {
+                    char *pathBuffer = new char[FS_MAX_PATH];
+                    u64 timestamp=0;
+                    Result rc = timeGetCurrentTime(TimeType_Default, &timestamp);
+                    if (R_SUCCEEDED(rc)) std::snprintf(pathBuffer, FS_MAX_PATH, "/libtesla_%ld.jpg", timestamp);
+                    else std::strcpy(pathBuffer, "/libtesla_screenshot.jpg");
+                    fsFsDeleteFile(&sdmc, pathBuffer);
+                    rc = fsFsCreateFile(&sdmc, pathBuffer, size, 0);
+                    if (R_SUCCEEDED(rc)) {
+                        FsFile file;
+                        rc = fsFsOpenFile(&sdmc, pathBuffer, FsOpenMode_Write, &file);
+                        if (R_SUCCEEDED(rc)) {
+                            fsFileWrite(&file, 0, buffer, size, FsWriteOption_Flush);
+                            fsFileClose(&file);
+                        }
+                    }
+                    delete[] pathBuffer;
+                    fsFsClose(&sdmc);
+                }
+            }
+            delete[] buffer;
+        }
         
         /**
          * @brief Wrapper for service initialization
@@ -3319,7 +3362,7 @@ namespace tsl {
         template<impl::LaunchFlags launchFlags>
         static void hidInputPoller(void *args) {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
-            
+
             // Parse Tesla settings
             impl::parseOverlaySettings(tsl::cfg::launchCombo);
 
@@ -3391,6 +3434,10 @@ namespace tsl {
                         }
                         else
                             eventFire(&shData->comboEvent);
+                    }
+
+                    if (((shData->keysHeld & tsl::cfg::captureCombo) == tsl::cfg::captureCombo) && shData->keysDown & tsl::cfg::captureCombo) {
+                        tsl::hlp::captureScreen();
                     }
 
                     shData->keysDownPending |= shData->keysDown;
@@ -3606,6 +3653,7 @@ namespace tsl::cfg {
     u16 FramebufferWidth  = 0;
     u16 FramebufferHeight = 0;
     u64 launchCombo = KEY_L | KEY_DDOWN | KEY_RSTICK;
+    u64 captureCombo = KEY_PLUS | KEY_MINUS;
 }
 
 extern "C" {
@@ -3620,6 +3668,8 @@ extern "C" {
      */
     void __appInit(void) {
         tsl::hlp::doWithSmSession([]{
+            ASSERT_FATAL(capsscInitialize());
+            ASSERT_FATAL(timeInitialize());
             ASSERT_FATAL(fsInitialize());
             ASSERT_FATAL(hidInitialize());      // Controller inputs and Touch
             ASSERT_FATAL(plInitialize());       // Font data
@@ -3634,6 +3684,8 @@ extern "C" {
      * 
      */
     void __appExit(void) {
+        capsscExit();
+        timeExit();
         fsExit();
         hidExit();
         plExit();
