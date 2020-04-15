@@ -1922,7 +1922,7 @@ namespace tsl {
              * @param index Index in the list where the item should be inserted. -1 or greater list size will insert it at the end
              * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type 
              */
-            virtual void addItem(Element *element, ssize_t index = -1, u16 height = 0) final {
+            virtual void addItem(Element *element, u16 height = 0, ssize_t index = -1) final {
                 if (element != nullptr) {
                     if (height != 0)
                         element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
