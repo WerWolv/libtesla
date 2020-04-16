@@ -94,22 +94,38 @@ namespace tsl {
 
     }
 
+    /**
+     * @brief RGBA4444 Color structure
+     */
+    struct Color {
+
+        union {
+            struct {
+                u16 r: 4, g: 4, b: 4, a: 4;
+            } PACKED;
+            u16 rgba;
+        };
+
+        constexpr inline Color(u16 raw): rgba(raw) {}
+        constexpr inline Color(u8 r, u8 g, u8 b, u8 a): r(r), g(g), b(b), a(a) {}
+    };
+
     namespace style {
-        constexpr u32 ListItemDefaultHeight = 70;       ///< Standard list item height
-        constexpr u32 TrackBarDefaultHeight = 90;      ///< Standard track bar height
-        constexpr u8 ListItemHighlightSaturation = 0x6; ///< Maximum saturation of Listitem highlights
-        constexpr u8 ListItemHighlightLength = 22;      ///< Maximum length of Listitem highlights
+        constexpr u32 ListItemDefaultHeight         = 70;       ///< Standard list item height
+        constexpr u32 TrackBarDefaultHeight         = 90;       ///< Standard track bar height
+        constexpr u8  ListItemHighlightSaturation   = 6;        ///< Maximum saturation of Listitem highlights
+        constexpr u8  ListItemHighlightLength       = 22;       ///< Maximum length of Listitem highlights
 
         namespace color {
-            constexpr u16 ColorFrameBackground  = 0xD000;   ///< Overlay frame background color
-            constexpr u16 ColorTransparent      = 0x0000;   ///< Transparent color
-            constexpr u16 ColorHighlight        = 0xFDF0;   ///< Greenish highlight color
-            constexpr u16 ColorFrame            = 0xF777;   ///< Outer boarder color
-            constexpr u16 ColorHandle           = 0xF555;   ///< Track bar handle color
-            constexpr u16 ColorText             = 0xFFFF;   ///< Standard text color
-            constexpr u16 ColorDescription      = 0xFAAA;   ///< Description text color
-            constexpr u16 ColorHeaderBar        = 0xFCCC;   ///< Category header rectangle color
-            constexpr u16 ColorClickAnimation   = 0xF220;
+            constexpr Color ColorFrameBackground  = { 0x0, 0x0, 0x0, 0xD };   ///< Overlay frame background color
+            constexpr Color ColorTransparent      = { 0x0, 0x0, 0x0, 0x0 };   ///< Transparent color
+            constexpr Color ColorHighlight        = { 0x0, 0xF, 0xD, 0xF };   ///< Greenish highlight color
+            constexpr Color ColorFrame            = { 0x7, 0x7, 0x7, 0xF };   ///< Outer boarder color
+            constexpr Color ColorHandle           = { 0x5, 0x5, 0x5, 0xF };   ///< Track bar handle color
+            constexpr Color ColorText             = { 0xF, 0xF, 0xF, 0xF };   ///< Standard text color
+            constexpr Color ColorDescription      = { 0xA, 0xA, 0xA, 0xF };   ///< Description text color
+            constexpr Color ColorHeaderBar        = { 0xC, 0xC, 0xC, 0xF };   ///< Category header rectangle color
+            constexpr Color ColorClickAnimation   = { 0x0, 0x2, 0x2, 0xF };   ///< Element click animation color
         }
     }
 
@@ -527,22 +543,6 @@ namespace tsl {
     namespace gfx {
 
         extern "C" u64 __nx_vi_layer_id;
-
-        /**
-         * @brief RGBA4444 Color structure
-         */
-        struct Color {
-
-            union {
-                struct {
-                    u16 r: 4, g: 4, b: 4, a: 4;
-                } PACKED;
-                u16 rgba;
-            };
-
-            inline Color(u16 raw): rgba(raw) {}
-            inline Color(u8 r, u8 g, u8 b, u8 a): r(r), g(g), b(b), a(a) {}
-        };
 
         struct ScissoringConfig {
             s32 x, y, w, h;
@@ -1317,7 +1317,7 @@ namespace tsl {
              * @param renderer Renderer
              */
             virtual void drawClickAnimation(gfx::Renderer *renderer) {
-                gfx::Color animColor = tsl::style::color::ColorClickAnimation;
+                Color animColor = tsl::style::color::ColorClickAnimation;
                 u8 saturation = tsl::style::ListItemHighlightSaturation * (float(this->m_clickAnimationProgress) / float(tsl::style::ListItemHighlightLength));
 
                 animColor.g = saturation;
@@ -1350,7 +1350,7 @@ namespace tsl {
             virtual void drawHighlight(gfx::Renderer *renderer) {
                 static float counter = 0;
                 const float progress = (std::sin(counter) + 1) / 2;
-                gfx::Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
+                Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
                                                 static_cast<u8>((0x8 - 0xF) * progress + 0xF), 
                                                 static_cast<u8>((0xC - 0xF) * progress + 0xF), 
                                                 0xF };
@@ -1768,7 +1768,7 @@ namespace tsl {
              * 
              * @param color Color of the rectangle
              */
-            DebugRectangle(gfx::Color color) : Element(), m_color(color) {}
+            DebugRectangle(Color color) : Element(), m_color(color) {}
             virtual ~DebugRectangle() {}
 
             virtual void draw(gfx::Renderer *renderer) override {
@@ -1778,7 +1778,7 @@ namespace tsl {
             virtual void layout(u16 parentX, u16 parentY, u16 parentWidth, u16 parentHeight) override {}
 
         private:
-            gfx::Color m_color;
+            Color m_color;
         };
 
 
@@ -2492,7 +2492,7 @@ namespace tsl {
             virtual void drawHighlight(gfx::Renderer *renderer) override {
                 static float counter = 0;
                 const float progress = (std::sin(counter) + 1) / 2;
-                gfx::Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
+                Color highlightColor = {   static_cast<u8>((0x2 - 0x8) * progress + 0x8),
                                                 static_cast<u8>((0x8 - 0xF) * progress + 0xF), 
                                                 static_cast<u8>((0xC - 0xF) * progress + 0xF), 
                                                 static_cast<u8>((0x6 - 0xD) * progress + 0xD) };
