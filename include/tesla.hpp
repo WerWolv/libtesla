@@ -238,9 +238,9 @@ namespace tsl {
          */
         static Result captureScreen() {
             /* Allocate buffer for jpeg. */
-            size_t buffer_size = 0x7D000;
-            u8 *buffer = new u8[buffer_size];
-            ScopeGuard buffer_guard([buffer] { delete[] buffer; });
+            size_t bufferSize = 0x7D000;
+            u8 *buffer = new u8[bufferSize];
+            ScopeGuard bufferGuard([buffer] { delete[] buffer; });
 
             /* Capture current screen. */
             u64 size;
@@ -248,29 +248,29 @@ namespace tsl {
                 u32 a;
                 u64 b;
             } in = {0, 10000000000};
+
             R_TRY(serviceDispatchInOut(capsscGetServiceSession(), 1204, in, size,
-                .buffer_attrs = {SfBufferAttr_HipcMapTransferAllowsNonSecure | SfBufferAttr_HipcMapAlias | SfBufferAttr_Out},
-                .buffers = { { buffer, buffer_size } },
+                .buffer_attrs = { SfBufferAttr_HipcMapTransferAllowsNonSecure | SfBufferAttr_HipcMapAlias | SfBufferAttr_Out },
+                .buffers = { { buffer, bufferSize } },
             ));
 
             /* Open Sd card filesystem. */
             FsFileSystem sdmc;
             R_TRY(fsOpenSdCardFileSystem(&sdmc));
-            ScopeGuard sdmc_guard([&sdmc] { fsFsClose(&sdmc); });
+            ScopeGuard sdmcGuard([&sdmc] { fsFsClose(&sdmc); });
 
             /* Allocate path buffer. */
             char *pathBuffer = new char[FS_MAX_PATH];
-            ScopeGuard path_guard([pathBuffer] { delete[] pathBuffer; });
+            ScopeGuard pathGuard([pathBuffer] { delete[] pathBuffer; });
 
             /* Get unique filepath. */
-            u64 timestamp=0;
-            Result rc = timeGetCurrentTime(TimeType_Default, &timestamp);
-            if (R_SUCCEEDED(rc)) std::snprintf(pathBuffer, FS_MAX_PATH, "/libtesla_%ld.jpg", timestamp);
-            else std::strcpy(pathBuffer, "/libtesla_screenshot.jpg");
+            u64 timestamp = svcGetSystemTick();
+            std::snprintf(pathBuffer, FS_MAX_PATH, "/libtesla_%ld.jpg", timestamp);
 
             /* Create file, open and write to it. */
             fsFsDeleteFile(&sdmc, pathBuffer);
             R_TRY(fsFsCreateFile(&sdmc, pathBuffer, size, 0));
+
             FsFile file;
             R_TRY(fsFsOpenFile(&sdmc, pathBuffer, FsOpenMode_Write, &file));
             fsFileWrite(&file, 0, buffer, size, FsWriteOption_Flush);
@@ -3677,7 +3677,6 @@ extern "C" {
     void __appInit(void) {
         tsl::hlp::doWithSmSession([]{
             ASSERT_FATAL(capsscInitialize());
-            ASSERT_FATAL(timeInitialize());
             ASSERT_FATAL(fsInitialize());
             ASSERT_FATAL(hidInitialize());                          // Controller inputs and Touch
             ASSERT_FATAL(plInitialize(PlServiceType_System));       // Font data. Use pl:s to prevent qlaunch/overlaydisp session exhaustion
@@ -3693,7 +3692,6 @@ extern "C" {
      */
     void __appExit(void) {
         capsscExit();
-        timeExit();
         fsExit();
         hidExit();
         plExit();
