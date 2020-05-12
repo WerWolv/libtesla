@@ -2297,7 +2297,7 @@ extern "C" {
             ASSERT_FATAL(fsInitialize());
             ASSERT_FATAL(fsdevMountSdmc());
             ASSERT_FATAL(hidInitialize());      // Controller inputs and Touch
-            ASSERT_FATAL(plInitialize());       // Font data
+            ASSERT_FATAL(plInitialize(PlServiceType_System));       // Font data
             ASSERT_FATAL(pmdmntInitialize());   // PID querying
             ASSERT_FATAL(hidsysInitialize());   // Focus control
             ASSERT_FATAL(setsysInitialize());   // Settings querying
