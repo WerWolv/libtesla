@@ -9,7 +9,7 @@ public:
     virtual tsl::elm::Element* createUI() override {
         auto *rootFrame = new tsl::elm::OverlayFrame("Tesla Example", "v1.3.2 - Secondary Gui");
 
-        rootFrame->setContent(new tsl::elm::DebugRectangle(tsl::gfx::Color{ 0x8, 0x3, 0x8, 0xF }));
+        rootFrame->setContent(new tsl::elm::DebugRectangle(tsl::Color{ 0x8, 0x3, 0x8, 0xF }));
 
         return rootFrame;
     }

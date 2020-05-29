@@ -89,8 +89,6 @@ namespace tsl {
         extern u16 FramebufferWidth;            ///< Width of the framebuffer
         extern u16 FramebufferHeight;           ///< Height of the framebuffer
         extern u64 launchCombo;                 ///< Overlay activation key combo
-        extern u64 captureCombo;                ///< Screenshot key combo
-        extern bool captureComboEnabled;        ///< Screenshot enabled
 
     }
 
@@ -245,55 +243,6 @@ namespace tsl {
                 ALWAYS_INLINE ~ScopeGuard() { if (f) { f(); } }
                 void dismiss() { f = nullptr; }
         };
-
-        /**
-         * @brief Capture the whole screen with overlays
-         * @note this allocates 0x7D301 bytes of heap memory so make sure you have that.
-         * 
-         * @return Result Result
-         */
-        static Result captureScreen() {
-            /* Allocate buffer for jpeg. */
-            size_t bufferSize = 0x7D000;
-            u8 *buffer = new u8[bufferSize];
-            ScopeGuard bufferGuard([buffer] { delete[] buffer; });
-
-            /* Capture current screen. */
-            u64 size;
-            struct {
-                u32 a;
-                u64 b;
-            } in = {0, 10000000000};
-
-            R_TRY(serviceDispatchInOut(capsscGetServiceSession(), 1204, in, size,
-                .buffer_attrs = { SfBufferAttr_HipcMapTransferAllowsNonSecure | SfBufferAttr_HipcMapAlias | SfBufferAttr_Out },
-                .buffers = { { buffer, bufferSize } },
-            ));
-
-            /* Open Sd card filesystem. */
-            FsFileSystem sdmc;
-            R_TRY(fsOpenSdCardFileSystem(&sdmc));
-            ScopeGuard sdmcGuard([&sdmc] { fsFsClose(&sdmc); });
-
-            /* Allocate path buffer. */
-            char *pathBuffer = new char[FS_MAX_PATH];
-            ScopeGuard pathGuard([pathBuffer] { delete[] pathBuffer; });
-
-            /* Get unique filepath. */
-            u64 timestamp = svcGetSystemTick();
-            std::snprintf(pathBuffer, FS_MAX_PATH, "/libtesla_%ld.jpg", timestamp);
-
-            /* Create file, open and write to it. */
-            fsFsDeleteFile(&sdmc, pathBuffer);
-            R_TRY(fsFsCreateFile(&sdmc, pathBuffer, size, 0));
-
-            FsFile file;
-            R_TRY(fsFsOpenFile(&sdmc, pathBuffer, FsOpenMode_Write, &file));
-            fsFileWrite(&file, 0, buffer, size, FsWriteOption_Flush);
-            fsFileClose(&file);
-
-            return 0;
-        }
 
         /**
          * @brief libnx hid:sys shim that gives or takes away frocus to or from the process with the given aruid
@@ -484,10 +433,6 @@ namespace tsl {
                 writeOverlaySettings(iniData);
             }
 
-        }
-
-        static bool stringToBool(const std::string &value) {
-            return (value == "true") || (value == "1");
         }
 
         /**
@@ -3338,12 +3283,6 @@ namespace tsl {
             u64 decodedKeys = hlp::comboStringToKeys(parsedConfig["tesla"]["key_combo"]);
             if (decodedKeys)
                 tsl::cfg::launchCombo = decodedKeys;
-
-            decodedKeys = hlp::comboStringToKeys(parsedConfig["tesla"]["screenshot_combo"]);
-            if (decodedKeys)
-                tsl::cfg::captureCombo = decodedKeys;
-
-            tsl::cfg::captureComboEnabled = hlp::stringToBool(parsedConfig["tesla"]["screenshot_combo_enabled"]);
         }
 
         /**
@@ -3441,10 +3380,6 @@ namespace tsl {
                         }
                         else
                             eventFire(&shData->comboEvent);
-                    }
-
-                    if (shData->overlayOpen && tsl::cfg::captureComboEnabled && ((shData->keysHeld & tsl::cfg::captureCombo) == tsl::cfg::captureCombo) && shData->keysDown & tsl::cfg::captureCombo) {
-                        tsl::hlp::captureScreen();
                     }
 
                     shData->keysDownPending |= shData->keysDown;
@@ -3660,13 +3595,12 @@ namespace tsl::cfg {
     u16 FramebufferWidth  = 0;
     u16 FramebufferHeight = 0;
     u64 launchCombo = KEY_L | KEY_DDOWN | KEY_RSTICK;
-    u64 captureCombo = KEY_PLUS | KEY_MINUS;
-    bool captureComboEnabled = false;
 }
 
 extern "C" {
 
     u32 __nx_applet_type = AppletType_None;
+    u32 __nx_fs_num_sessions = 1;
     u32  __nx_nv_transfermem_size = 0x40000;
     ViLayerFlags __nx_vi_stray_layer_flags = (ViLayerFlags)0;
 
@@ -3676,7 +3610,6 @@ extern "C" {
      */
     void __appInit(void) {
         tsl::hlp::doWithSmSession([]{
-            ASSERT_FATAL(capsscInitialize());
             ASSERT_FATAL(fsInitialize());
             ASSERT_FATAL(hidInitialize());                          // Controller inputs and Touch
             ASSERT_FATAL(plInitialize(PlServiceType_System));       // Font data. Use pl:s to prevent qlaunch/overlaydisp session exhaustion
@@ -3691,7 +3624,6 @@ extern "C" {
      * 
      */
     void __appExit(void) {
-        capsscExit();
         fsExit();
         hidExit();
         plExit();
