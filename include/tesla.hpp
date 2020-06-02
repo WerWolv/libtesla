@@ -1029,6 +1029,8 @@ namespace tsl {
                 nwindowClose(&this->m_window);
                 viCloseLayer(&this->m_layer);
                 viDestroyManagedLayer(&layerCopy); // Copy is required because viCloseLayer wipes the passed layer object
+                viCloseDisplay(&this->m_display);
+                eventClose(&this->m_vsyncEvent);
                 viExit();
             }
 
