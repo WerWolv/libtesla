@@ -1023,12 +1023,11 @@ namespace tsl {
                 if (!this->m_initialized)
                     return;
 
-                ViLayer layerCopy = this->m_layer;
-
                 framebufferClose(&this->m_framebuffer);
                 nwindowClose(&this->m_window);
-                viCloseLayer(&this->m_layer);
-                viDestroyManagedLayer(&layerCopy); // Copy is required because viCloseLayer wipes the passed layer object
+                viDestroyManagedLayer(&this->m_layer);
+                viCloseDisplay(&this->m_display);
+                eventClose(&this->m_vsyncEvent);
                 viExit();
             }
 
