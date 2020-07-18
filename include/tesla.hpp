@@ -1556,6 +1556,10 @@ namespace tsl {
 
             }
 
+            std::function<void(gfx::Renderer *, s32, s32, s32, s32)> &getMRenderFunc() {
+                return m_renderFunc;
+            }
+
         private:
             std::function<void(gfx::Renderer*, s32 x, s32 y, s32 w, s32 h)> m_renderFunc;
         };
