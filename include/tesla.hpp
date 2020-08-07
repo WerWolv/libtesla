@@ -853,7 +853,7 @@ namespace tsl {
 
                 } while (string[strPos] != '\0' && string[strPos] != '\n' && currX < maxLength);
 
-                std::strcpy(&string[strPos - codepointWidth], "…");
+                string = string.substr(0, strPos - codepointWidth) + "…";
                 string.shrink_to_fit();
 
                 return string;
