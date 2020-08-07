@@ -260,6 +260,15 @@ namespace tsl {
             return serviceDispatchIn(hidsysGetServiceSession(), 503, in);
         }
 
+        static Result viAddToLayerStack(ViLayer *layer, ViLayerStack stack) {
+            const struct {
+                u32 stack;
+                u64 layerId;
+            } in = { stack, layer->layer_id };
+
+            return serviceDispatchIn(viGetSession_IManagerDisplayService(), 6000, in);
+        }
+
         /**
          * @brief Toggles focus between the Tesla overlay and the rest of the system
          * 
@@ -1000,10 +1009,17 @@ namespace tsl {
                     ASSERT_FATAL(viGetDisplayVsyncEvent(&this->m_display, &this->m_vsyncEvent));
                     ASSERT_FATAL(viCreateManagedLayer(&this->m_display, static_cast<ViLayerFlags>(0), 0, &__nx_vi_layer_id));
                     ASSERT_FATAL(viCreateLayer(&this->m_display, &this->m_layer));
-                    ASSERT_FATAL(viSetLayerScalingMode(&this->m_layer, ViScalingMode_PreserveAspectRatio));
+                    ASSERT_FATAL(viSetLayerScalingMode(&this->m_layer, ViScalingMode_FitToLayer));
 
-                    if (s32 layerZ = 0; R_SUCCEEDED(viGetZOrderCountMax(&this->m_display, &layerZ)) && layerZ > 0)
-                        ASSERT_FATAL(viSetLayerZ(&this->m_layer, layerZ));
+                    ASSERT_FATAL(tsl::hlp::viAddToLayerStack(&this->m_layer, ViLayerStack_Default));
+                    ASSERT_FATAL(tsl::hlp::viAddToLayerStack(&this->m_layer, ViLayerStack_Screenshot));
+                    ASSERT_FATAL(tsl::hlp::viAddToLayerStack(&this->m_layer, ViLayerStack_Recording));
+                    ASSERT_FATAL(tsl::hlp::viAddToLayerStack(&this->m_layer, ViLayerStack_Arbitrary));
+                    ASSERT_FATAL(tsl::hlp::viAddToLayerStack(&this->m_layer, ViLayerStack_LastFrame));
+                    ASSERT_FATAL(tsl::hlp::viAddToLayerStack(&this->m_layer, ViLayerStack_Null));
+                    ASSERT_FATAL(tsl::hlp::viAddToLayerStack(&this->m_layer, ViLayerStack_ApplicationForDebug));
+                    ASSERT_FATAL(tsl::hlp::viAddToLayerStack(&this->m_layer, ViLayerStack_Lcd));
+                    //ASSERT_FATAL(tsl::hlp::viAddToLayerStack(&this->m_layer, 8));
 
                     ASSERT_FATAL(viSetLayerSize(&this->m_layer, cfg::LayerWidth, cfg::LayerHeight));
                     ASSERT_FATAL(viSetLayerPosition(&this->m_layer, cfg::LayerPosX, cfg::LayerPosY));
