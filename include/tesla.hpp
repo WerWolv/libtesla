@@ -1058,7 +1058,7 @@ namespace tsl {
              * @brief Start a new frame
              * @warning Don't call this more than once before calling \ref endFrame
              */
-            inline void startFrame() {
+            inline void startFrame() {              
                 this->m_currentFramebuffer = framebufferBegin(&this->m_framebuffer, nullptr);
             }
 
@@ -1252,6 +1252,13 @@ namespace tsl {
              */
             virtual void triggerClickAnimation() final {
                 this->m_clickAnimationProgress = tsl::style::ListItemHighlightLength;
+            }
+
+            /**
+             * @brief Resets the click animation progress, canceling the animation 
+             */
+            virtual void resetClickAnimation() final {
+                this->m_clickAnimationProgress = 0;
             }
 
             /**
@@ -3200,6 +3207,9 @@ namespace tsl {
          * @return Reference to the Gui
          */
         std::unique_ptr<tsl::Gui>& changeTo(std::unique_ptr<tsl::Gui>&& gui) {
+            if (this->m_guiStack.top() != nullptr && this->m_guiStack.top()->m_focusedElement != nullptr)
+                this->m_guiStack.top()->m_focusedElement->resetClickAnimation();
+
             gui->m_topElement = gui->createUI();
 
             this->m_guiStack.push(std::move(gui));
