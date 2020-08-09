@@ -62,7 +62,7 @@
 #define ALWAYS_INLINE inline __attribute__((always_inline))
 
 /// Evaluates an expression that returns a result, and returns the result if it would fail.
-#define R_TRY(resultExpr)               \
+#define TSL_R_TRY(resultExpr)           \
     ({                                  \
         const auto result = resultExpr; \
         if (R_FAILED(result)) {         \
@@ -1059,13 +1059,13 @@ namespace tsl {
                 static PlFontData stdFontData, extFontData;
 
                 // Nintendo's default font
-                R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard));
+                TSL_R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard));
 
                 u8 *fontBuffer = reinterpret_cast<u8*>(stdFontData.address);
                 stbtt_InitFont(&this->m_stdFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
 
                 // Nintendo's extended font containing a bunch of icons
-                R_TRY(plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt));
+                TSL_R_TRY(plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt));
 
                 fontBuffer = reinterpret_cast<u8*>(extFontData.address);
                 stbtt_InitFont(&this->m_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
