@@ -77,7 +77,7 @@ public:
 
     // Called once every frame to handle inputs not handled by other UI elements
     virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
-        return false;   // Return true here to singal the inputs have been consumed
+        return false;   // Return true here to signal the inputs have been consumed
     }
 };
 
@@ -85,7 +85,7 @@ class OverlayTest : public tsl::Overlay {
 public:
                                              // libtesla already initialized fs, hid, pl, pmdmnt, hid:sys and set:sys
     virtual void initServices() override {}  // Called at the start to initialize all services necessary for this Overlay
-    virtual void exitServices() override {}  // Callet at the end to clean up all services previously initialized
+    virtual void exitServices() override {}  // Called at the end to clean up all services previously initialized
 
     virtual void onShow() override {}    // Called before overlay wants to change from invisible to visible state
     virtual void onHide() override {}    // Called before overlay wants to change from visible to invisible state

@@ -3487,7 +3487,7 @@ namespace tsl {
 
     /**
      * @brief Pops the top Gui from the stack and goes back to the last one
-     * @note The Overlay gets closes once there are no more Guis on the stack
+     * @note The Overlay gets closed once there are no more Guis on the stack
      */
     static void goBack() {
         Overlay::get()->goBack();
