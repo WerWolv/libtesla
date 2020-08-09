@@ -33,7 +33,7 @@ public:
         list->addItem(new tsl::elm::CategoryHeader("List items"));
 
         auto *clickableListItem = new tsl::elm::ListItem("Clickable List Item", "...");
-        clickableListItem->setClickListener([](u64 keys) { 
+        clickableListItem->setClickListener([](u64 keys) {
             if (keys & KEY_A) {
                 tsl::changeTo<GuiSecondary>();
                 return true;
@@ -46,7 +46,7 @@ public:
         list->addItem(new tsl::elm::ListItem("Default List Item"));
         list->addItem(new tsl::elm::ListItem("Default List Item with an extra long name to trigger truncation and scrolling"));
         list->addItem(new tsl::elm::ToggleListItem("Toggle List Item", true));
-        
+
         // Custom Drawer, a element that gives direct access to the renderer
         list->addItem(new tsl::elm::CategoryHeader("Custom Drawer", true));
         list->addItem(new tsl::elm::CustomDrawer([](tsl::gfx::Renderer *renderer, s32 x, s32 y, s32 w, s32 h) {
@@ -65,7 +65,7 @@ public:
 
         // Add the list to the frame for it to be drawn
         frame->setContent(list);
-        
+
         // Return the frame to have it become the top level element of this Gui
         return frame;
     }
