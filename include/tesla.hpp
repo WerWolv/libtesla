@@ -2357,6 +2357,14 @@ namespace tsl {
                 return nullptr;
             }
 
+            inline void setText(const std::string &text) {
+                this->m_text = text;
+            }
+
+            inline const std::string &getText() const {
+                return this->m_text;
+            }
+
         private:
             std::string m_text;
             bool m_hasSeparator;
