@@ -2361,7 +2361,7 @@ namespace tsl {
                 this->m_text = text;
             }
 
-            inline const std::string &getText() const {
+            inline const std::string& getText() const {
                 return this->m_text;
             }
 
