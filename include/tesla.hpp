@@ -2274,10 +2274,7 @@ namespace tsl {
 
             virtual bool onClick(u64 keys) override {
                 if (keys & KEY_A) {
-                    this->m_state = !this->m_state;
-
-                    this->setState(this->m_state);
-                    this->m_stateChangedListener(this->m_state);
+                    this->setState(!this->m_state);
 
                     return ListItem::onClick(keys);
                 }
@@ -2300,12 +2297,16 @@ namespace tsl {
              * @param state State
              */
             virtual void setState(bool state) {
+                bool stateChanged = state != this->m_state;
                 this->m_state = state;
 
                 if (state)
                     this->setValue(this->m_onValue, false);
                 else
                     this->setValue(this->m_offValue, true);
+                
+                if(stateChanged && this->m_stateChangedListener)
+                    this->m_stateChangedListener(state);
             }
 
             /**
