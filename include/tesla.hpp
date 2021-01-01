@@ -782,7 +782,7 @@ namespace tsl {
                     if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
                         currFont = &this->m_extFont;
                     else if (stbtt_FindGlyphIndex(&this->m_stdChineseFont, currCharacter))
-+                        currFont = &this->m_stdChineseFont;
+                        currFont = &this->m_stdChineseFont;
                     else
                         currFont = &this->m_stdFont;
 
@@ -844,7 +844,7 @@ namespace tsl {
                     if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
                         currFont = &this->m_extFont;
                     else if (stbtt_FindGlyphIndex(&this->m_stdChineseFont, currCharacter))
-+                        currFont = &this->m_stdChineseFont;
+                        currFont = &this->m_stdChineseFont;
                     else
                         currFont = &this->m_stdFont;
 
@@ -1068,17 +1068,17 @@ namespace tsl {
                 u8 *fontBuffer = reinterpret_cast<u8*>(stdFontData.address);
                 stbtt_InitFont(&this->m_stdFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
 
-                // Nintendo's extended font containing a bunch of icons
-                TSL_R_TRY(plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt));
-
-                fontBuffer = reinterpret_cast<u8*>(extFontData.address);
-                stbtt_InitFont(&this->m_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
-
                 // Nintendo's Chinese simplified font
                 TSL_R_TRY(plGetSharedFontByType(&stdChineseFontData, PlSharedFontType_ChineseSimplified));
 
                 fontBuffer = reinterpret_cast<u8*>(stdChineseFontData.address);
                 stbtt_InitFont(&this->m_stdChineseFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+
+                // Nintendo's extended font containing a bunch of icons
+                TSL_R_TRY(plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt));
+
+                fontBuffer = reinterpret_cast<u8*>(extFontData.address);
+                stbtt_InitFont(&this->m_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
 
                 return 0;
             }
