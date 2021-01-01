@@ -1075,7 +1075,7 @@ namespace tsl {
                 stbtt_InitFont(&this->m_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
 
                 // Nintendo's Chinese simplified font
-                R_TRY(plGetSharedFontByType(&stdChineseFontData, PlSharedFontType_ChineseSimplified));
+                TSL_R_TRY(plGetSharedFontByType(&stdChineseFontData, PlSharedFontType_ChineseSimplified));
 
                 fontBuffer = reinterpret_cast<u8*>(stdChineseFontData.address);
                 stbtt_InitFont(&this->m_stdChineseFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
