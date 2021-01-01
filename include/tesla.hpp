@@ -781,6 +781,8 @@ namespace tsl {
 
                     if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
                         currFont = &this->m_extFont;
+                    else if (stbtt_FindGlyphIndex(&this->m_stdChineseFont, currCharacter))
++                        currFont = &this->m_stdChineseFont;
                     else
                         currFont = &this->m_stdFont;
 
@@ -841,6 +843,8 @@ namespace tsl {
 
                     if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
                         currFont = &this->m_extFont;
+                    else if (stbtt_FindGlyphIndex(&this->m_stdChineseFont, currCharacter))
++                        currFont = &this->m_stdChineseFont;
                     else
                         currFont = &this->m_stdFont;
 
@@ -897,7 +901,7 @@ namespace tsl {
             ScissoringConfig m_currScissorConfig;
             std::vector<ScissoringConfig> m_scissoringStack;
 
-            stbtt_fontinfo m_stdFont, m_extFont;
+            stbtt_fontinfo m_stdFont, m_stdChineseFont, m_extFont;
 
             static inline float s_opacity = 1.0F;
 
@@ -1056,7 +1060,7 @@ namespace tsl {
              * @return Result
              */
             Result initFonts() {
-                static PlFontData stdFontData, extFontData;
+                static PlFontData stdFontData, stdChineseFontData, extFontData;
 
                 // Nintendo's default font
                 TSL_R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard));
@@ -1069,6 +1073,12 @@ namespace tsl {
 
                 fontBuffer = reinterpret_cast<u8*>(extFontData.address);
                 stbtt_InitFont(&this->m_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+
+                // Nintendo's Chinese simplified font
+                R_TRY(plGetSharedFontByType(&stdChineseFontData, PlSharedFontType_ChineseSimplified));
+
+                fontBuffer = reinterpret_cast<u8*>(stdChineseFontData.address);
+                stbtt_InitFont(&this->m_stdChineseFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
 
                 return 0;
             }
@@ -3436,7 +3446,7 @@ namespace tsl {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
             // To prevent focus glitchout, close the overlay immediately when the home button gets pressed
-            hidsysAcquireHomeButtonEventHandle(&shData->homeButtonPressEvent);
+            hidsysAcquireHomeButtonEventHandle(&shData->homeButtonPressEvent, true);
             eventClear(&shData->homeButtonPressEvent);
 
             while (shData->running) {
@@ -3462,7 +3472,7 @@ namespace tsl {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
             // To prevent focus glitchout, close the overlay immediately when the power button gets pressed
-            hidsysAcquireSleepButtonEventHandle(&shData->powerButtonPressEvent);
+            hidsysAcquireSleepButtonEventHandle(&shData->powerButtonPressEvent, true);
             eventClear(&shData->powerButtonPressEvent);
 
             while (shData->running) {
