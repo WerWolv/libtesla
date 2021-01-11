@@ -1520,6 +1520,10 @@ namespace tsl {
 
             }
 
+            std::function<void(gfx::Renderer *, s32, s32, s32, s32)> &getMRenderFunc() {
+                return m_renderFunc;
+            }
+
         private:
             std::function<void(gfx::Renderer*, s32 x, s32 y, s32 w, s32 h)> m_renderFunc;
         };
@@ -1537,7 +1541,9 @@ namespace tsl {
              * @param title Name of the Overlay drawn bolt at the top
              * @param subtitle Subtitle drawn bellow the title e.g version number
              */
-            OverlayFrame(const std::string& title, const std::string& subtitle) : Element(), m_title(title), m_subtitle(subtitle) {}
+            OverlayFrame(const std::string& title, const std::string& subtitle) : Element(), m_title(title), m_subtitle(subtitle) {
+              m_footer_title = "\uE0E1  Back     \uE0E0  OK";
+            }
             virtual ~OverlayFrame() {
                 if (this->m_contentElement != nullptr)
                     delete this->m_contentElement;
@@ -1552,7 +1558,7 @@ namespace tsl {
 
                 renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
 
-                renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(tsl::style::color::ColorText));
+                renderer->drawString(this->m_footer_title.c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
 
                 if (this->m_contentElement != nullptr)
                     this->m_contentElement->frame(renderer);
@@ -1619,10 +1625,15 @@ namespace tsl {
                 this->m_subtitle = subtitle;
             }
 
+            virtual void setFooterTitle(const std::string &footer_title) final {
+              this->m_footer_title = footer_title;
+            }
+
         protected:
             Element *m_contentElement = nullptr;
 
             std::string m_title, m_subtitle;
+            std::string m_footer_title;
         };
 
         /**
@@ -3436,7 +3447,7 @@ namespace tsl {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
             // To prevent focus glitchout, close the overlay immediately when the home button gets pressed
-            hidsysAcquireHomeButtonEventHandle(&shData->homeButtonPressEvent);
+            hidsysAcquireHomeButtonEventHandle(&shData->homeButtonPressEvent, true);
             eventClear(&shData->homeButtonPressEvent);
 
             while (shData->running) {
@@ -3462,7 +3473,7 @@ namespace tsl {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
             // To prevent focus glitchout, close the overlay immediately when the power button gets pressed
-            hidsysAcquireSleepButtonEventHandle(&shData->powerButtonPressEvent);
+            hidsysAcquireSleepButtonEventHandle(&shData->powerButtonPressEvent, true);
             eventClear(&shData->powerButtonPressEvent);
 
             while (shData->running) {
