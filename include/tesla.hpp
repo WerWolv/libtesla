@@ -182,15 +182,15 @@ namespace tsl {
          *
          * Ordered as they should be displayed
          */
-        static const std::vector<KeyInfo> KEYS_INFO = {
-            { KEY_L, "L", "\uE0A4" }, { KEY_R, "R", "\uE0A5" },
-            { KEY_ZL, "ZL", "\uE0A6" }, { KEY_ZR, "ZR", "\uE0A7" },
-            { KEY_SL, "SL", "\uE0A8" }, { KEY_SR, "SR", "\uE0A9" },
-            { KEY_DLEFT, "DLEFT", "\uE07B" }, { KEY_DUP, "DUP", "\uE079" }, { KEY_DRIGHT, "DRIGHT", "\uE07C" }, { KEY_DDOWN, "DDOWN", "\uE07A" },
-            { KEY_A, "A", "\uE0A0" }, { KEY_B, "B", "\uE0A1" }, { KEY_X, "X", "\uE0A2" }, { KEY_Y, "Y", "\uE0A3" },
-            { KEY_LSTICK, "LS", "\uE08A" }, { KEY_RSTICK, "RS", "\uE08B" },
-            { KEY_MINUS, "MINUS", "\uE0B6" }, { KEY_PLUS, "PLUS", "\uE0B5" }
-        };
+        constexpr std::array<KeyInfo, 18> KEYS_INFO = {{
+            { HidNpadButton_L, "L", "\uE0A4" }, { HidNpadButton_R, "R", "\uE0A5" },
+            { HidNpadButton_ZL, "ZL", "\uE0A6" }, { HidNpadButton_ZR, "ZR", "\uE0A7" },
+            { HidNpadButton_AnySL, "SL", "\uE0A8" }, { HidNpadButton_AnySR, "SR", "\uE0A9" },
+            { HidNpadButton_Left, "DLEFT", "\uE07B" }, { HidNpadButton_Up, "DUP", "\uE079" }, { HidNpadButton_Right, "DRIGHT", "\uE07C" }, { HidNpadButton_Down, "DDOWN", "\uE07A" },
+            { HidNpadButton_A, "A", "\uE0A0" }, { HidNpadButton_B, "B", "\uE0A1" }, { HidNpadButton_X, "X", "\uE0A2" }, { HidNpadButton_Y, "Y", "\uE0A3" },
+            { HidNpadButton_StickL, "LS", "\uE08A" }, { HidNpadButton_StickR, "RS", "\uE08B" },
+            { HidNpadButton_Minus, "MINUS", "\uE0B6" }, { HidNpadButton_Plus, "PLUS", "\uE0B5" }
+        }};
 
     }
 
@@ -1181,7 +1181,7 @@ namespace tsl {
              * @param rightJoyStick Right joystick position
              * @return Weather or not the input has been consumed
              */
-            virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchPos, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight) {
+            virtual bool handleInput(u64 keysDown, u64 keysHeld, const HidTouchState &touchPos, HidAnalogStickState joyStickPosLeft, HidAnalogStickState joyStickPosRight) {
                 return false;
             }
 
@@ -2149,9 +2149,9 @@ namespace tsl {
             }
 
             virtual bool onClick(u64 keys) override {
-                if (keys & KEY_A)
+                if (keys & HidNpadButton_A)
                     this->triggerClickAnimation();
-                else if (keys & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT))
+                else if (keys & (HidNpadButton_AnyUp | HidNpadButton_AnyDown | HidNpadButton_AnyLeft | HidNpadButton_AnyRight))
                     this->m_clickAnimationProgress = 0;
 
                 return Element::onClick(keys);
@@ -2166,7 +2166,7 @@ namespace tsl {
                     this->m_touched = false;
 
                     if (Element::getInputMode() == InputMode::Touch) {
-                        bool handled = this->onClick(KEY_A);
+                        bool handled = this->onClick(HidNpadButton_A);
 
                         this->m_clickAnimationProgress = 0;
                         return handled;
@@ -2273,7 +2273,7 @@ namespace tsl {
             virtual ~ToggleListItem() {}
 
             virtual bool onClick(u64 keys) override {
-                if (keys & KEY_A) {
+                if (keys & HidNpadButton_A) {
                     this->m_state = !this->m_state;
 
                     this->setState(this->m_state);
@@ -2389,11 +2389,11 @@ namespace tsl {
                 return this;
             }
 
-            virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
-                if (keysHeld & KEY_LEFT && keysHeld & KEY_RIGHT)
+            virtual bool handleInput(u64 keysDown, u64 keysHeld, const HidTouchState &touchPos, HidAnalogStickState leftJoyStick, HidAnalogStickState rightJoyStick) override {
+                if (keysHeld & HidNpadButton_AnyLeft && keysHeld & HidNpadButton_AnyRight)
                     return true;
 
-                if (keysHeld & KEY_LEFT) {
+                if (keysHeld & HidNpadButton_AnyLeft) {
                     if (this->m_value > 0) {
                         this->m_value--;
                         this->m_valueChangedListener(this->m_value);
@@ -2401,7 +2401,7 @@ namespace tsl {
                     }
                 }
 
-                if (keysHeld & KEY_RIGHT) {
+                if (keysHeld & HidNpadButton_AnyRight) {
                     if (this->m_value < 100) {
                         this->m_value++;
                         this->m_valueChangedListener(this->m_value);
@@ -2569,19 +2569,19 @@ namespace tsl {
 
             virtual ~StepTrackBar() {}
 
-            virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) override {
+            virtual bool handleInput(u64 keysDown, u64 keysHeld, const HidTouchState &touchPos, HidAnalogStickState leftJoyStick, HidAnalogStickState rightJoyStick) override {
                 static u32 tick = 0;
 
-                if (keysHeld & KEY_LEFT && keysHeld & KEY_RIGHT) {
+                if (keysHeld & HidNpadButton_AnyLeft && keysHeld & HidNpadButton_AnyRight) {
                     tick = 0;
                     return true;
                 }
 
-                if (keysHeld & (KEY_LEFT | KEY_RIGHT)) {
+                if (keysHeld & (HidNpadButton_AnyLeft | HidNpadButton_AnyRight)) {
                     if ((tick == 0 || tick > 20) && (tick % 3) == 0) {
-                        if (keysHeld & KEY_LEFT && this->m_value > 0) {
+                        if (keysHeld & HidNpadButton_AnyLeft && this->m_value > 0) {
                             this->m_value = std::max(this->m_value - (100 / (this->m_numSteps - 1)), 0);
-                        } else if (keysHeld & KEY_RIGHT && this->m_value < 100) {
+                        } else if (keysHeld & HidNpadButton_AnyRight && this->m_value < 100) {
                             this->m_value = std::min(this->m_value + (100 / (this->m_numSteps - 1)), 100);
                         } else {
                             return false;
@@ -2726,7 +2726,7 @@ namespace tsl {
          * @param rightJoyStick Right joystick position
          * @return Weather or not the input has been consumed
          */
-        virtual bool handleInput(u64 keysDown, u64 keysHeld, touchPosition touchInput, JoystickPosition leftJoyStick, JoystickPosition rightJoyStick) {
+        virtual bool handleInput(u64 keysDown, u64 keysHeld, const HidTouchState &touchPos, HidAnalogStickState leftJoyStick, HidAnalogStickState rightJoyStick) {
             return false;
         }
 
@@ -3063,9 +3063,9 @@ namespace tsl {
          * @param rightJoyStick Right joystick position
          * @return Weather or not the input has been consumed
          */
-        virtual void handleInput(u64 keysDown, u64 keysHeld, bool touchDetected, touchPosition touchPos, JoystickPosition joyStickPosLeft, JoystickPosition joyStickPosRight) final {
-            static touchPosition initialTouchPos = { 0 };
-            static touchPosition oldTouchPos = { 0 };
+        virtual void handleInput(u64 keysDown, u64 keysHeld, bool touchDetected, const HidTouchState &touchPos, HidAnalogStickState joyStickPosLeft, HidAnalogStickState joyStickPosRight) final {
+            static HidTouchState initialTouchPos = { 0 };
+            static HidTouchState oldTouchPos = { 0 };
             static bool oldTouchDetected = false;
             static elm::TouchEvent touchEvent;
             static u32 repeatTick = 0;
@@ -3079,8 +3079,8 @@ namespace tsl {
             auto topElement = currentGui->getTopElement();
 
             if (currentFocus == nullptr) {
-                if (keysDown & KEY_B) {
-                    if (!currentGui->handleInput(KEY_B, 0,{},{},{}))
+                if (keysDown & HidNpadButton_B) {
+                    if (!currentGui->handleInput(HidNpadButton_B, 0,{},{},{}))
                         this->goBack();
                     return;
                 }
@@ -3088,7 +3088,7 @@ namespace tsl {
                 if (topElement == nullptr)
                     return;
                 else if (currentGui != nullptr) {
-                    if (!currentGui->initialFocusSet() || keysDown & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT)) {
+                    if (!currentGui->initialFocusSet() || keysDown & (HidNpadButton_AnyUp | HidNpadButton_AnyDown | HidNpadButton_AnyLeft | HidNpadButton_AnyRight)) {
                         currentGui->requestFocus(topElement, FocusDirection::None);
                         currentGui->markInitialFocusSet();
                         repeatTick = 1;
@@ -3118,22 +3118,22 @@ namespace tsl {
             if (!handled && currentFocus != nullptr) {
                 static bool shouldShake = true;
 
-                if ((((keysHeld & KEY_UP) != 0) + ((keysHeld & KEY_DOWN) != 0) + ((keysHeld & KEY_LEFT) != 0) + ((keysHeld & KEY_RIGHT) != 0)) == 1) {
+                if ((((keysHeld & HidNpadButton_AnyUp) != 0) + ((keysHeld & HidNpadButton_AnyDown) != 0) + ((keysHeld & HidNpadButton_AnyLeft) != 0) + ((keysHeld & HidNpadButton_AnyRight) != 0)) == 1) {
                     if ((repeatTick == 0 || repeatTick > 20) && (repeatTick % 4) == 0) {
-                        if (keysHeld & KEY_UP)
+                        if (keysHeld & HidNpadButton_AnyUp)
                             currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Up, shouldShake);
-                        else if (keysHeld & KEY_DOWN)
+                        else if (keysHeld & HidNpadButton_AnyDown)
                             currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Down, shouldShake);
-                        else if (keysHeld & KEY_LEFT)
+                        else if (keysHeld & HidNpadButton_AnyLeft)
                             currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Left, shouldShake);
-                        else if (keysHeld & KEY_RIGHT)
+                        else if (keysHeld & HidNpadButton_AnyRight)
                             currentGui->requestFocus(currentFocus->getParent(), FocusDirection::Right, shouldShake);
 
                         shouldShake = currentGui->getFocusedElement() != currentFocus;
                     }
                     repeatTick++;
                 } else {
-                    if (keysDown & KEY_B)
+                    if (keysDown & HidNpadButton_B)
                         this->goBack();
                     repeatTick = 0;
                     shouldShake = true;
@@ -3142,13 +3142,13 @@ namespace tsl {
 
             if (!touchDetected && oldTouchDetected) {
                 if (currentGui != nullptr && topElement != nullptr)
-                    topElement->onTouch(elm::TouchEvent::Release, oldTouchPos.px, oldTouchPos.py, oldTouchPos.px, oldTouchPos.py, initialTouchPos.px, initialTouchPos.py);
+                    topElement->onTouch(elm::TouchEvent::Release, oldTouchPos.x, oldTouchPos.y, oldTouchPos.x, oldTouchPos.y, initialTouchPos.x, initialTouchPos.y);
             }
 
             if (touchDetected) {
 
-                u32 xDistance = std::abs(static_cast<s32>(initialTouchPos.px) - static_cast<s32>(touchPos.px));
-                u32 yDistance = std::abs(static_cast<s32>(initialTouchPos.py) - static_cast<s32>(touchPos.py));
+                u32 xDistance = std::abs(static_cast<s32>(initialTouchPos.x) - static_cast<s32>(touchPos.x));
+                u32 yDistance = std::abs(static_cast<s32>(initialTouchPos.y) - static_cast<s32>(touchPos.y));
 
                 xDistance *= xDistance;
                 yDistance *= yDistance;
@@ -3170,12 +3170,12 @@ namespace tsl {
 
 
                 if (currentGui != nullptr && topElement != nullptr)
-                    topElement->onTouch(touchEvent, touchPos.px, touchPos.py, oldTouchPos.px, oldTouchPos.py, initialTouchPos.px, initialTouchPos.py);
+                    topElement->onTouch(touchEvent, touchPos.x, touchPos.y, oldTouchPos.x, oldTouchPos.y, initialTouchPos.x, initialTouchPos.y);
 
                 oldTouchPos = touchPos;
 
                 // Hide overlay when touching out of bounds
-                if (touchPos.px >= cfg::FramebufferWidth) {
+                if (touchPos.x >= cfg::FramebufferWidth) {
                     if (tsl::elm::Element::getInputMode() == tsl::InputMode::Touch) {
                         oldTouchPos = { 0 };
                         initialTouchPos = { 0 };
@@ -3184,9 +3184,9 @@ namespace tsl {
                     }
                 }
             } else {
-                if (oldTouchPos.px < 150U && oldTouchPos.py > cfg::FramebufferHeight - 73U)
-                    if (initialTouchPos.px < 150U && initialTouchPos.py > cfg::FramebufferHeight - 73U)
-                        if (!currentGui->handleInput(KEY_B, 0,{},{},{}))
+                if (oldTouchPos.x < 150U && oldTouchPos.y > cfg::FramebufferHeight - 73U)
+                    if (initialTouchPos.x < 150U && initialTouchPos.y > cfg::FramebufferHeight - 73U)
+                        if (!currentGui->handleInput(HidNpadButton_B, 0,{},{},{}))
                             this->goBack();
 
                 elm::Element::setInputMode(InputMode::Controller);
@@ -3303,9 +3303,8 @@ namespace tsl {
             u64 keysDown = 0;
             u64 keysDownPending = 0;
             u64 keysHeld = 0;
-            touchPosition touchPos = { 0 };
-            u32 touchCount = 0;
-            JoystickPosition joyStickPosLeft = { 0 }, joyStickPosRight = { 0 };
+            HidTouchScreenState touchState = { 0 };
+            HidAnalogStickState joyStickPosLeft = { 0 }, joyStickPosRight = { 0 };
         };
 
 
@@ -3348,66 +3347,36 @@ namespace tsl {
             // Parse Tesla settings
             impl::parseOverlaySettings();
 
+            // Configure input to take all controllers and up to 8
+            padConfigureInput(8, HidNpadStyleSet_NpadStandard);
+
+            // Initialize pad
+            PadState pad;
+            padInitializeAny(&pad);
+            
+            // Initialize touch screen
+            hidInitializeTouchScreen();
+
             // Drop all inputs from the previous overlay
-            hidScanInput();
+            padUpdate(&pad);
 
             while (shData->running) {
 
                 // Scan for input changes
-                hidScanInput();
+                padUpdate(&pad);
 
                 // Read in HID values
                 {
                     std::scoped_lock lock(shData->dataMutex);
 
-                    shData->keysDown = 0;
-                    shData->keysHeld = 0;
-                    shData->joyStickPosLeft  = { 0 };
-                    shData->joyStickPosRight = { 0 };
-
-                    // Combine input from all controllers
-                    for (u8 controller = 0; controller < 8; controller++) {
-                        if (hidIsControllerConnected(static_cast<HidControllerID>(controller))) {
-                            shData->keysDown |= hidKeysDown(static_cast<HidControllerID>(controller));
-                            shData->keysHeld |= hidKeysHeld(static_cast<HidControllerID>(controller));
-
-                            JoystickPosition joyStickPosLeft, joyStickPosRight;
-                            hidJoystickRead(&joyStickPosLeft, static_cast<HidControllerID>(controller), HidControllerJoystick::JOYSTICK_LEFT);
-                            hidJoystickRead(&joyStickPosRight, static_cast<HidControllerID>(controller), HidControllerJoystick::JOYSTICK_RIGHT);
-
-                            if (joyStickPosLeft.dx > 0 && joyStickPosLeft.dx > shData->joyStickPosLeft.dx)
-                                shData->joyStickPosLeft.dx = joyStickPosLeft.dx;
-                            if (joyStickPosLeft.dx < 0 && joyStickPosLeft.dx < shData->joyStickPosLeft.dx)
-                                shData->joyStickPosLeft.dx = joyStickPosLeft.dx;
-                            if (joyStickPosLeft.dy > 0 && joyStickPosLeft.dy > shData->joyStickPosLeft.dy)
-                                shData->joyStickPosLeft.dy = joyStickPosLeft.dy;
-                            if (joyStickPosLeft.dy < 0 && joyStickPosLeft.dy < shData->joyStickPosLeft.dy)
-                                shData->joyStickPosLeft.dy = joyStickPosLeft.dy;
-                            if (joyStickPosRight.dx > 0 && joyStickPosRight.dx > shData->joyStickPosRight.dx)
-                                shData->joyStickPosRight.dx = joyStickPosRight.dx;
-                            if (joyStickPosRight.dx < 0 && joyStickPosRight.dx < shData->joyStickPosRight.dx)
-                                shData->joyStickPosRight.dx = joyStickPosRight.dx;
-                            if (joyStickPosRight.dy > 0 && joyStickPosRight.dy > shData->joyStickPosRight.dy)
-                                shData->joyStickPosRight.dy = joyStickPosRight.dy;
-                            if (joyStickPosRight.dy < 0 && joyStickPosRight.dy < shData->joyStickPosRight.dy)
-                                shData->joyStickPosRight.dy = joyStickPosRight.dy;
-                        }
-                    }
-
-                    if (hidIsControllerConnected(CONTROLLER_HANDHELD)) {
-                        shData->keysDown |= hidKeysDown(CONTROLLER_HANDHELD);
-                        shData->keysHeld |= hidKeysHeld(CONTROLLER_HANDHELD);
-
-                        hidJoystickRead(&shData->joyStickPosLeft, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_LEFT);
-                        hidJoystickRead(&shData->joyStickPosRight, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_RIGHT);
-                    }
+                    shData->keysDown = padGetButtonsDown(&pad);
+                    shData->keysHeld = padGetButtons(&pad);
+                    shData->joyStickPosLeft  = padGetStickPos(&pad, 0);
+                    shData->joyStickPosRight = padGetStickPos(&pad, 1);
 
                     // Read in touch positions
-                    shData->touchCount = hidTouchCount();
-                    if (shData->touchCount > 0)
-                        hidTouchRead(&shData->touchPos, 0);
-                    else
-                        shData->touchPos = { 0 };
+                    if (hidGetTouchScreenStates(&shData->touchState, 1) == 0)
+                        shData->touchState = { 0 };
 
                     if (((shData->keysHeld & tsl::cfg::launchCombo) == tsl::cfg::launchCombo) && shData->keysDown & tsl::cfg::launchCombo) {
                         if (shData->overlayOpen) {
@@ -3436,7 +3405,7 @@ namespace tsl {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
             // To prevent focus glitchout, close the overlay immediately when the home button gets pressed
-            hidsysAcquireHomeButtonEventHandle(&shData->homeButtonPressEvent);
+            hidsysAcquireHomeButtonEventHandle(&shData->homeButtonPressEvent, false);
             eventClear(&shData->homeButtonPressEvent);
 
             while (shData->running) {
@@ -3462,7 +3431,7 @@ namespace tsl {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
 
             // To prevent focus glitchout, close the overlay immediately when the power button gets pressed
-            hidsysAcquireSleepButtonEventHandle(&shData->powerButtonPressEvent);
+            hidsysAcquireSleepButtonEventHandle(&shData->powerButtonPressEvent, false);
             eventClear(&shData->powerButtonPressEvent);
 
             while (shData->running) {
@@ -3577,7 +3546,7 @@ namespace tsl {
                 {
                     std::scoped_lock lock(shData.dataMutex);
                     if (!overlay->fadeAnimationPlaying()) {
-                        overlay->handleInput(shData.keysDownPending, shData.keysHeld, shData.touchCount > 0, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
+                        overlay->handleInput(shData.keysDownPending, shData.keysHeld, shData.touchState.count, shData.touchState.touches[0], shData.joyStickPosLeft, shData.joyStickPosRight);
                     }
                     shData.keysDownPending = 0;
                 }
@@ -3630,7 +3599,7 @@ namespace tsl::cfg {
     u16 LayerPosY   = 0;
     u16 FramebufferWidth  = 0;
     u16 FramebufferHeight = 0;
-    u64 launchCombo = KEY_L | KEY_DDOWN | KEY_RSTICK;
+    u64 launchCombo = HidNpadButton_L | HidNpadButton_Down | HidNpadButton_StickR;
 }
 
 extern "C" {
