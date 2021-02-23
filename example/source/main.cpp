@@ -34,7 +34,7 @@ public:
 
         auto *clickableListItem = new tsl::elm::ListItem("Clickable List Item", "...");
         clickableListItem->setClickListener([](u64 keys) {
-            if (keys & KEY_A) {
+            if (keys & HidNpadButton_A) {
                 tsl::changeTo<GuiSecondary>();
                 return true;
             }
