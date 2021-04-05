@@ -1028,7 +1028,9 @@ namespace tsl {
                     ASSERT_FATAL(viSetLayerPosition(&this->m_layer, cfg::LayerPosX, cfg::LayerPosY));
                     ASSERT_FATAL(nwindowCreateFromLayer(&this->m_window, &this->m_layer));
                     ASSERT_FATAL(framebufferCreate(&this->m_framebuffer, &this->m_window, cfg::FramebufferWidth, cfg::FramebufferHeight, PIXEL_FORMAT_RGBA_4444, 2));
+                    ASSERT_FATAL(setInitialize());
                     ASSERT_FATAL(this->initFonts());
+                    ASSERT_FATAL(setExit());
                 });
 
                 this->m_initialized = true;
@@ -1059,7 +1061,33 @@ namespace tsl {
                 static PlFontData stdFontData, extFontData;
 
                 // Nintendo's default font
-                TSL_R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard));
+                u64 languageCode;
+                if (R_SUCCEEDED(setGetSystemLanguage(&languageCode)))
+                {
+                    SetLanguage setLanguage;
+                    TSL_R_TRY(setMakeLanguage( languageCode, &setLanguage));
+                    switch (setLanguage)
+                    {
+                    case SetLanguage_ZHCN:
+                    case SetLanguage_ZHHANS:
+                        TSL_R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_ChineseSimplified));
+                        break;
+                    case SetLanguage_KO:
+                        TSL_R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_KO));
+                        break;
+                    case SetLanguage_ZHTW:
+                    case SetLanguage_ZHHANT:
+                        TSL_R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_ChineseTraditional));
+                        break;
+                    default:
+                        TSL_R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard));
+                        break;
+                    }
+                }
+                else
+                {
+                    TSL_R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard));
+                }
 
                 u8 *fontBuffer = reinterpret_cast<u8*>(stdFontData.address);
                 stbtt_InitFont(&this->m_stdFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
