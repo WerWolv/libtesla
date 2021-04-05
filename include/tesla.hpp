@@ -1030,7 +1030,7 @@ namespace tsl {
                     ASSERT_FATAL(framebufferCreate(&this->m_framebuffer, &this->m_window, cfg::FramebufferWidth, cfg::FramebufferHeight, PIXEL_FORMAT_RGBA_4444, 2));
                     ASSERT_FATAL(setInitialize());
                     ASSERT_FATAL(this->initFonts());
-                    ASSERT_FATAL(setExit());
+                    setExit();
                 });
 
                 this->m_initialized = true;
