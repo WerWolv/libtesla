@@ -781,8 +781,8 @@ namespace tsl {
 
                     if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
                         currFont = &this->m_extFont;
-                    else if (stbtt_FindGlyphIndex(&this->m_stdChineseFont, currCharacter))
-                        currFont = &this->m_stdChineseFont;
+                    else if(this->m_hasLocalFont && stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter)==0)
+                        currFont = &this->m_localFont;
                     else
                         currFont = &this->m_stdFont;
 
@@ -843,8 +843,8 @@ namespace tsl {
 
                     if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
                         currFont = &this->m_extFont;
-                    else if (stbtt_FindGlyphIndex(&this->m_stdChineseFont, currCharacter))
-                        currFont = &this->m_stdChineseFont;
+                    else if(this->m_hasLocalFont && stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter)==0)
+                        currFont = &this->m_localFont;
                     else
                         currFont = &this->m_stdFont;
 
@@ -901,7 +901,8 @@ namespace tsl {
             ScissoringConfig m_currScissorConfig;
             std::vector<ScissoringConfig> m_scissoringStack;
 
-            stbtt_fontinfo m_stdFont, m_stdChineseFont, m_extFont;
+            stbtt_fontinfo m_stdFont, m_localFont, m_extFont;
+            bool m_hasLocalFont = false;
 
             static inline float s_opacity = 1.0F;
 
@@ -1032,7 +1033,9 @@ namespace tsl {
                     ASSERT_FATAL(viSetLayerPosition(&this->m_layer, cfg::LayerPosX, cfg::LayerPosY));
                     ASSERT_FATAL(nwindowCreateFromLayer(&this->m_window, &this->m_layer));
                     ASSERT_FATAL(framebufferCreate(&this->m_framebuffer, &this->m_window, cfg::FramebufferWidth, cfg::FramebufferHeight, PIXEL_FORMAT_RGBA_4444, 2));
+                    ASSERT_FATAL(setInitialize());
                     ASSERT_FATAL(this->initFonts());
+                    setExit();
                 });
 
                 this->m_initialized = true;
@@ -1060,7 +1063,7 @@ namespace tsl {
              * @return Result
              */
             Result initFonts() {
-                static PlFontData stdFontData, stdChineseFontData, extFontData;
+                static PlFontData stdFontData, localFontData, extFontData;
 
                 // Nintendo's default font
                 TSL_R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard));
@@ -1068,11 +1071,34 @@ namespace tsl {
                 u8 *fontBuffer = reinterpret_cast<u8*>(stdFontData.address);
                 stbtt_InitFont(&this->m_stdFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
 
-                // Nintendo's Chinese simplified font
-                TSL_R_TRY(plGetSharedFontByType(&stdChineseFontData, PlSharedFontType_ChineseSimplified));
+                u64 languageCode;
+                if (R_SUCCEEDED(setGetSystemLanguage(&languageCode))) {
+                    // Check if need localization font
+                    SetLanguage setLanguage;
+                    TSL_R_TRY(setMakeLanguage(languageCode, &setLanguage));
+                    this->m_hasLocalFont = true; 
+                    switch (setLanguage) {
+                    case SetLanguage_ZHCN:
+                    case SetLanguage_ZHHANS:
+                        TSL_R_TRY(plGetSharedFontByType(&localFontData, PlSharedFontType_ChineseSimplified));
+                        break;
+                    case SetLanguage_KO:
+                        TSL_R_TRY(plGetSharedFontByType(&localFontData, PlSharedFontType_KO));
+                        break;
+                    case SetLanguage_ZHTW:
+                    case SetLanguage_ZHHANT:
+                        TSL_R_TRY(plGetSharedFontByType(&localFontData, PlSharedFontType_ChineseTraditional));
+                        break;
+                    default:
+                        this->m_hasLocalFont = false; 
+                        break;
+                    }
 
-                fontBuffer = reinterpret_cast<u8*>(stdChineseFontData.address);
-                stbtt_InitFont(&this->m_stdChineseFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+                    if (this->m_hasLocalFont) {
+                        fontBuffer = reinterpret_cast<u8*>(localFontData.address);
+                        stbtt_InitFont(&this->m_localFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+                    }
+                }                
 
                 // Nintendo's extended font containing a bunch of icons
                 TSL_R_TRY(plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt));
