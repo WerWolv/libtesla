@@ -3384,7 +3384,7 @@ namespace tsl {
             impl::parseOverlaySettings();
 
             // Configure input to take all controllers and up to 8
-            padConfigureInput(8, HidNpadStyleSet_NpadStandard);
+            padConfigureInput(8, HidNpadStyleSet_NpadStandard | HidNpadStyleTag_NpadSystemExt);
 
             // Initialize pad
             PadState pad;
