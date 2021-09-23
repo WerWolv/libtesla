@@ -111,7 +111,7 @@ namespace tsl {
     /**
      * @brief Main frame button text
      */
-    std::string MainFrameButtonText{"\uE0E1  Back     \uE0E0  OK"};
+    static std::string MainFrameButtonText{"\uE0E1  Back     \uE0E0  OK"};
 
     namespace style {
         constexpr u32 ListItemDefaultHeight         = 70;       ///< Standard list item height
