@@ -71,6 +71,7 @@
     })
 
 u8 TeslaFPS = 1;
+bool IsFrameBackground = true;
 bool FullMode = true;
 
 using namespace std::literals::string_literals;
@@ -1592,7 +1593,7 @@ namespace tsl {
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
-                renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
+                renderer->fillScreen(a(IsFrameBackground ? tsl::style::color::ColorFrameBackground : tsl::style::color::ColorTransparent));
                 renderer->drawRect(tsl::cfg::FramebufferWidth - 1, 0, 1, tsl::cfg::FramebufferHeight, a(0xF222));
 
                 renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
