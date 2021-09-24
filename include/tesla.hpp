@@ -70,6 +70,9 @@
         }                               \
     })
 
+u8 TeslaFPS = 1;
+bool FullMode = true;
+
 using namespace std::literals::string_literals;
 using namespace std::literals::chrono_literals;
 
@@ -1130,6 +1133,7 @@ namespace tsl {
              * @warning Don't call this before calling \ref startFrame once
              */
             inline void endFrame() {
+                svcSleepThread(1000*1000*1000 / TeslaFPS);
                 this->waitForVSync();
                 framebufferEnd(&this->m_framebuffer);
 
@@ -1594,9 +1598,10 @@ namespace tsl {
                 renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
                 renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorDescription));
 
-                renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
-
-                renderer->drawString(tsl::MainFrameButtonText.c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
+                if (FullMode == true)
+                    renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
+                if (TeslaFPS == 60)
+                    renderer->drawString(tsl::MainFrameButtonText.c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
 
                 if (this->m_contentElement != nullptr)
                     this->m_contentElement->frame(renderer);
@@ -1819,7 +1824,7 @@ namespace tsl {
 
                     this->m_items.clear();
                     this->m_offset = 0;
-                    this->m_focusedIndex = 0;
+                    this->m_focusedIndex = 0; //####
                     this->invalidate();
                     this->m_clearList = false;
                 }
@@ -2941,7 +2946,7 @@ namespace tsl {
                 this->m_disableNextAnimation = false;
             }
             else {
-                this->m_fadeInAnimationPlaying = true;
+                this->m_fadeInAnimationPlaying = false;
                 this->m_animationCounter = 0;
             }
 
@@ -2961,7 +2966,7 @@ namespace tsl {
                 this->m_disableNextAnimation = false;
             }
             else {
-                this->m_fadeOutAnimationPlaying = true;
+                this->m_fadeOutAnimationPlaying = false;
                 this->m_animationCounter = 5;
             }
 
@@ -3125,7 +3130,7 @@ namespace tsl {
             if (currentFocus == nullptr) {
                 if (keysDown & HidNpadButton_B) {
                     if (!currentGui->handleInput(HidNpadButton_B, 0,{},{},{}))
-                        this->goBack();
+                        this->goBack();//####
                     return;
                 }
 
@@ -3178,7 +3183,7 @@ namespace tsl {
                     repeatTick++;
                 } else {
                     if (keysDown & HidNpadButton_B)
-                        this->goBack();
+                        this->goBack();//####
                     repeatTick = 0;
                     shouldShake = true;
                 }
