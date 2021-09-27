@@ -781,7 +781,7 @@ namespace tsl {
 
                     if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
                         currFont = &this->m_extFont;
-                    else if(this->m_localFontData.address != nullptr && stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter)==0)
+                    else if(this->m_hasLocalFont && stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter)==0)
                         currFont = &this->m_localFont;
                     else
                         currFont = &this->m_stdFont;
@@ -843,7 +843,7 @@ namespace tsl {
 
                     if (stbtt_FindGlyphIndex(&this->m_extFont, currCharacter))
                         currFont = &this->m_extFont;
-                    else if(this->m_localFontData.address != nullptr && stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter)==0)
+                    else if(this->m_hasLocalFont && stbtt_FindGlyphIndex(&this->m_stdFont, currCharacter)==0)
                         currFont = &this->m_localFont;
                     else
                         currFont = &this->m_stdFont;
@@ -914,7 +914,7 @@ namespace tsl {
             std::vector<ScissoringConfig> m_scissoringStack;
 
             stbtt_fontinfo m_stdFont, m_localFont, m_extFont;
-            PlFontData m_localFontData{PlSharedFontType_Total, 0, 0, nullptr};
+            bool m_hasLocalFont = false;
 
             static inline float s_opacity = 1.0F;
 
@@ -1073,7 +1073,7 @@ namespace tsl {
              * @return Result
              */
             Result initFonts() {
-                static PlFontData stdFontData, extFontData;
+                static PlFontData stdFontData, localFontData, extFontData;
 
                 // Nintendo's default font
                 TSL_R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard));
@@ -1092,29 +1092,30 @@ namespace tsl {
                     if (R_SUCCEEDED(setGetSystemLanguage(&languageCode))) {
                         SetLanguage setLanguage;
                         if (R_SUCCEEDED(setMakeLanguage(languageCode, &setLanguage))) {
+                            this->m_hasLocalFont = true;
                             switch (setLanguage) {
                             case SetLanguage_ZHCN:
                             case SetLanguage_ZHHANS:
-                                if(R_SUCCEEDED(plGetSharedFontByType(&this->m_localFontData, PlSharedFontType_ChineseSimplified)))
+                                if(R_SUCCEEDED(plGetSharedFontByType(&localFontData, PlSharedFontType_ChineseSimplified)))
                                     this->m_MainFrameButtonText = "\uE0E1  返回     \uE0E0  确认";
                                 break;
                             case SetLanguage_KO:
-                                if(R_SUCCEEDED(plGetSharedFontByType(&this->m_localFontData, PlSharedFontType_KO)))
+                                if(R_SUCCEEDED(plGetSharedFontByType(&localFontData, PlSharedFontType_KO)))
                                     this->m_MainFrameButtonText = "\uE0E1  뒤로     \uE0E0  확인";
                                 break;
                             case SetLanguage_ZHTW:
                             case SetLanguage_ZHHANT:
-                                if(R_SUCCEEDED(plGetSharedFontByType(&this->m_localFontData, PlSharedFontType_ChineseTraditional)))
+                                if(R_SUCCEEDED(plGetSharedFontByType(&localFontData, PlSharedFontType_ChineseTraditional)))
                                     this->m_MainFrameButtonText = "\uE0E1  返回     \uE0E0  確認";
                                 break;
                             default:
+                                this->m_hasLocalFont = false;
                                 break;
                             }
-                        }
-
-                        if (this->m_localFontData.address != nullptr) {
-                            fontBuffer = reinterpret_cast<u8*>(this->m_localFontData.address);
-                            stbtt_InitFont(&this->m_localFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+                            if (this->m_hasLocalFont) {
+                                fontBuffer = reinterpret_cast<u8*>(localFontData.address);
+                                stbtt_InitFont(&this->m_localFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+                            }
                         }
                     }
                     setExit();
