@@ -899,7 +899,7 @@ namespace tsl {
             /**
              * @brief Main frame button text
              */
-            std::string m_MainFrameButtonText{"\uE0E1  Back     \uE0E0  OK"};
+            std::string m_MainFrameButtonText{"\uE0E1  返回     \uE0E0  确认"};
             bool m_initialized = false;
             ViDisplay m_display;
             ViLayer m_layer;
