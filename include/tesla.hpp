@@ -1825,7 +1825,7 @@ namespace tsl {
 
                     this->m_items.clear();
                     this->m_offset = 0;
-                    this->m_focusedIndex = 0; 
+                    this->m_focusedIndex = 0;
                     this->invalidate();
                     this->m_clearList = false;
                 }
