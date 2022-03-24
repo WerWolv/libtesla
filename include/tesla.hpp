@@ -72,7 +72,6 @@
 
 #ifdef BUILD_STATUS_MONITOR_OVERLAY
 u8 TeslaFPS = 1;
-bool IsFrameBackground = true;
 bool FullMode = true;
 #endif
 
@@ -1604,27 +1603,22 @@ namespace tsl {
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
-#ifndef BUILD_STATUS_MONITOR_OVERLAY
                 renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
-#else
-                renderer->fillScreen(a(IsFrameBackground ? tsl::style::color::ColorFrameBackground : tsl::style::color::ColorTransparent));
-#endif
-
+#ifndef BUILD_STATUS_MONITOR_OVERLAY
                 renderer->drawRect(tsl::cfg::FramebufferWidth - 1, 0, 1, tsl::cfg::FramebufferHeight, a(0xF222));
+#endif
 
                 renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
-                renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorDescription));
+                renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorText));
 
-#ifndef BUILD_STATUS_MONITOR_OVERLAY
-                renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
-
-                renderer->drawString(renderer->getMainFrameButtonText().c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
-#else
+#ifdef BUILD_STATUS_MONITOR_OVERLAY
                 if (FullMode == true)
-                    renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
-                if (TeslaFPS == 60)
-                    renderer->drawString(renderer->getMainFrameButtonText().c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
 #endif
+                    renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
+#ifdef BUILD_STATUS_MONITOR_OVERLAY
+                if (TeslaFPS == 60)
+#endif
+                    renderer->drawString("\uE0E1  Back     \uE0E0  OK", false, 30, 693, 23, a(tsl::style::color::ColorText));
 
                 if (this->m_contentElement != nullptr)
                     this->m_contentElement->frame(renderer);
@@ -1634,7 +1628,11 @@ namespace tsl {
                 this->setBoundaries(parentX, parentY, parentWidth, parentHeight);
 
                 if (this->m_contentElement != nullptr) {
+#ifdef BUILD_STATUS_MONITOR_OVERLAY
+                    this->m_contentElement->setBoundaries(parentX + 35, parentY + 175, parentWidth - 85, parentHeight - 90 - 100);
+#else
                     this->m_contentElement->setBoundaries(parentX + 35, parentY + 125, parentWidth - 85, parentHeight - 73 - 125);
+#endif
                     this->m_contentElement->invalidate();
                 }
             }
@@ -3159,11 +3157,13 @@ namespace tsl {
             auto topElement = currentGui->getTopElement();
 
             if (currentFocus == nullptr) {
+#ifdef BUILD_STATUS_MONITOR_OVERLAY
                 if (keysDown & HidNpadButton_B) {
                     if (!currentGui->handleInput(HidNpadButton_B, 0,{},{},{}))
                         this->goBack();
                     return;
                 }
+#endif
 
                 if (topElement == nullptr)
                     return;
@@ -3213,8 +3213,10 @@ namespace tsl {
                     }
                     repeatTick++;
                 } else {
+#ifdef BUILD_STATUS_MONITOR_OVERLAY
                     if (keysDown & HidNpadButton_B)
                         this->goBack();
+#endif
                     repeatTick = 0;
                     shouldShake = true;
                 }
@@ -3486,7 +3488,9 @@ namespace tsl {
 
             // To prevent focus glitchout, close the overlay immediately when the home button gets pressed
             hidsysAcquireHomeButtonEventHandle(&shData->homeButtonPressEvent, false);
+#ifdef BUILD_STATUS_MONITOR_OVERLAY
             eventClear(&shData->homeButtonPressEvent);
+#endif
 
             while (shData->running) {
                 if (R_SUCCEEDED(eventWait(&shData->homeButtonPressEvent, 100'000'000))) {
@@ -3512,7 +3516,9 @@ namespace tsl {
 
             // To prevent focus glitchout, close the overlay immediately when the power button gets pressed
             hidsysAcquireSleepButtonEventHandle(&shData->powerButtonPressEvent, false);
+#ifdef BUILD_STATUS_MONITOR_OVERLAY
             eventClear(&shData->powerButtonPressEvent);
+#endif
 
             while (shData->running) {
                 if (R_SUCCEEDED(eventWait(&shData->powerButtonPressEvent, 100'000'000))) {
