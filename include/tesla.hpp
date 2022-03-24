@@ -19,6 +19,32 @@
 
 #pragma once
 
+#define KEY_A HidNpadButton_A
+#define KEY_B HidNpadButton_B
+#define KEY_X HidNpadButton_X
+#define KEY_Y HidNpadButton_Y
+#define KEY_L HidNpadButton_L
+#define KEY_R HidNpadButton_R
+#define KEY_ZL HidNpadButton_ZL
+#define KEY_ZR HidNpadButton_ZR
+#define KEY_PLUS HidNpadButton_Plus
+#define KEY_MINUS HidNpadButton_Minus
+#define KEY_DUP HidNpadButton_Up
+#define KEY_DDOWN HidNpadButton_Down
+#define KEY_DLEFT HidNpadButton_Left
+#define KEY_DRIGHT HidNpadButton_Right
+#define KEY_SL HidNpadButton_AnySL
+#define KEY_SR HidNpadButton_AnySR
+#define KEY_LSTICK HidNpadButton_StickL
+#define KEY_RSTICK HidNpadButton_StickR
+#define KEY_UP (HidNpadButton_Up | HidNpadButton_StickLUp | HidNpadButton_StickRUp)
+#define KEY_DOWN (HidNpadButton_Down | HidNpadButton_StickLDown | HidNpadButton_StickRDown)
+#define KEY_LEFT (HidNpadButton_Left | HidNpadButton_StickLLeft | HidNpadButton_StickRLeft)
+#define KEY_RIGHT (HidNpadButton_Right | HidNpadButton_StickLRight | HidNpadButton_StickRRight)
+#define touchPosition const HidTouchState
+#define touchInput &touchPos
+#define JoystickPosition HidAnalogStickState
+
 #include <switch.h>
 
 #include <stdlib.h>
@@ -39,6 +65,8 @@
 #include <map>
 
 
+
+
 // Define this makro before including tesla.hpp in your main file. If you intend
 // to use the tesla.hpp header in more than one source file, only define it once!
 // #define TESLA_INIT_IMPL
@@ -57,9 +85,10 @@
 #define ASSERT_EXIT(x) if (R_FAILED(x)) std::exit(1)
 #define ASSERT_FATAL(x) if (Result res = x; R_FAILED(res)) fatalThrow(res)
 	
-u8 TeslaFPS = 1;
+u8 TeslaFPS = 60;
 u8 alphabackground = 0xD;
 bool FullMode = true;
+PadState pad;
 
 using namespace std::literals::chrono_literals;
 
@@ -1988,7 +2017,7 @@ namespace tsl {
             u64 keysDown = 0;
             u64 keysDownPending = 0;
             u64 keysHeld = 0;
-            touchPosition touchPos = { 0 };
+            HidTouchScreenState touchState = { 0 };
             JoystickPosition joyStickPosLeft = { 0 }, joyStickPosRight = { 0 };
         };
 
@@ -2032,43 +2061,30 @@ namespace tsl {
             // Parse Tesla settings
             impl::parseOverlaySettings(shData->launchCombo);
 
+            padInitializeAny(&pad);
+
+            hidInitializeTouchScreen();
+
             // Drop all inputs from the previous overlay
-            hidScanInput();
+            padUpdate(&pad);
 
             while (shData->running) {
                 
                 // Scan for input changes
-                hidScanInput();
+                padUpdate(&pad);
 
                 // Read in HID values
                 {
                     std::scoped_lock lock(shData->dataMutex);
 
-                    shData->keysDown = 0;
-                    shData->keysHeld = 0;
-
-                    // Combine input from all controllers
-                    for (u8 controller = 0; controller < 8; controller++) {
-                        if (hidIsControllerConnected(static_cast<HidControllerID>(controller))) {
-                            shData->keysDown |= hidKeysDown(static_cast<HidControllerID>(controller));
-                            shData->keysHeld |= hidKeysHeld(static_cast<HidControllerID>(controller));
-                        }
-                    }
-
-                    if (hidIsControllerConnected(CONTROLLER_HANDHELD)) {
-                        shData->keysDown |= hidKeysDown(CONTROLLER_HANDHELD);
-                        shData->keysHeld |= hidKeysHeld(CONTROLLER_HANDHELD);
-                    }
+                    shData->keysDown = padGetButtonsDown(&pad);
+                    shData->keysHeld = padGetButtons(&pad);
+                    shData->joyStickPosLeft  = padGetStickPos(&pad, 0);
+                    shData->joyStickPosRight = padGetStickPos(&pad, 1);
 
                     // Read in touch positions
-                    if (hidTouchCount() > 0)
-                        hidTouchRead(&shData->touchPos, 0);
-                    else 
-                        shData->touchPos = { 0 };
-
-                    // Read in joystick values
-                    hidJoystickRead(&shData->joyStickPosLeft, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_LEFT);
-                    hidJoystickRead(&shData->joyStickPosRight, CONTROLLER_HANDHELD, HidControllerJoystick::JOYSTICK_RIGHT);
+                    if (hidGetTouchScreenStates(&shData->touchState, 1) == 0)
+                        shData->touchState = { 0 };
 
                     if (((shData->keysHeld & shData->launchCombo) == shData->launchCombo) && shData->keysDown & shData->launchCombo) {
                         if (shData->overlayOpen) {
@@ -2077,13 +2093,6 @@ namespace tsl {
                         }
                         else
                             eventFire(&shData->comboEvent);
-                    }
-
-                    if (shData->touchPos.px >= cfg::FramebufferWidth && shData->overlayOpen) {
-                        if (shData->overlayOpen) {
-                            tsl::Overlay::get()->hide();
-                            shData->overlayOpen = false;
-                        }
                     }
 
                     shData->keysDownPending |= shData->keysDown;
@@ -2242,7 +2251,7 @@ namespace tsl {
                 {
                     std::scoped_lock lock(shData.dataMutex);
                     if (!overlay->fadeAnimationPlaying()) {
-                        overlay->handleInput(shData.keysDownPending, shData.keysHeld, shData.touchPos, shData.joyStickPosLeft, shData.joyStickPosRight);
+                        overlay->handleInput(shData.keysDownPending, shData.keysHeld, shData.touchState.touches[0], shData.joyStickPosLeft, shData.joyStickPosRight);
                     }
                     shData.keysDownPending = 0;
                 }
