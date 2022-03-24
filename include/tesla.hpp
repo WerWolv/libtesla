@@ -1618,12 +1618,12 @@ namespace tsl {
 #ifndef BUILD_STATUS_MONITOR_OVERLAY
                 renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
 
-                renderer->drawString(renderer->getMainFrameButtonText().c_str().c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
+                renderer->drawString(renderer->getMainFrameButtonText().c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
 #else
                 if (FullMode == true)
                     renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
                 if (TeslaFPS == 60)
-                    renderer->drawString(renderer->getMainFrameButtonText().c_str().c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
+                    renderer->drawString(renderer->getMainFrameButtonText().c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
 #endif
 
                 if (this->m_contentElement != nullptr)
