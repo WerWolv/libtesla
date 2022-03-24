@@ -1606,7 +1606,7 @@ namespace tsl {
             virtual void draw(gfx::Renderer *renderer) override {
 #ifndef BUILD_STATUS_MONITOR_OVERLAY
                 renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
-#else                
+#else
                 renderer->fillScreen(a(IsFrameBackground ? tsl::style::color::ColorFrameBackground : tsl::style::color::ColorTransparent));
 #endif
 
@@ -1718,7 +1718,7 @@ namespace tsl {
 
                 renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
 
-                renderer->drawString(renderer->getMainFrameButtonText().c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
+                renderer->drawString(tsl::MainFrameButtonText.c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
 
                 if (this->m_header != nullptr)
                     this->m_header->frame(renderer);
