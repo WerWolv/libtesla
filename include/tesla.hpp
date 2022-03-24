@@ -112,6 +112,11 @@ namespace tsl {
         constexpr inline Color(u8 r, u8 g, u8 b, u8 a): r(r), g(g), b(b), a(a) {}
     };
 
+    /**
+     * @brief Main frame button text
+     */
+    std::string m_MainFrameButtonText{"\uE0E1  返回     \uE0E0  确认"};
+
     namespace style {
         constexpr u32 ListItemDefaultHeight         = 70;       ///< Standard list item height
         constexpr u32 TrackBarDefaultHeight         = 90;       ///< Standard track bar height
@@ -867,14 +872,6 @@ namespace tsl {
                 return string;
             }
 
-            /**
-             * @brief Get the main frame button display string
-             *
-             * @return Main button display text
-             */
-            std::string getMainFrameButtonText() {
-                return this->m_MainFrameButtonText;
-            }
         private:
             Renderer() {}
 
@@ -900,10 +897,6 @@ namespace tsl {
                 Renderer::s_opacity = opacity;
             }
 
-            /**
-             * @brief Main frame button text
-             */
-            std::string m_MainFrameButtonText{"\uE0E1  返回     \uE0E0  确认"};
             bool m_initialized = false;
             ViDisplay m_display;
             ViLayer m_layer;
@@ -1049,7 +1042,9 @@ namespace tsl {
                     ASSERT_FATAL(viSetLayerPosition(&this->m_layer, cfg::LayerPosX, cfg::LayerPosY));
                     ASSERT_FATAL(nwindowCreateFromLayer(&this->m_window, &this->m_layer));
                     ASSERT_FATAL(framebufferCreate(&this->m_framebuffer, &this->m_window, cfg::FramebufferWidth, cfg::FramebufferHeight, PIXEL_FORMAT_RGBA_4444, 2));
+                    ASSERT_FATAL(setInitialize());
                     ASSERT_FATAL(this->initFonts());
+                    setExit();
                 });
 
                 this->m_initialized = true;
@@ -1083,45 +1078,45 @@ namespace tsl {
                 TSL_R_TRY(plGetSharedFontByType(&stdFontData, PlSharedFontType_Standard));
 
                 u8 *fontBuffer = reinterpret_cast<u8*>(stdFontData.address);
-                stbtt_InitFont(&this->m_stdFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));          
+                stbtt_InitFont(&this->m_stdFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+
+                u64 languageCode;
+                if (R_SUCCEEDED(setGetSystemLanguage(&languageCode))) {
+                    // Check if need localization font
+                    SetLanguage setLanguage;
+                    TSL_R_TRY(setMakeLanguage(languageCode, &setLanguage));
+                    this->m_hasLocalFont = true; 
+                    switch (setLanguage) {
+                    case SetLanguage_ZHCN:
+                    case SetLanguage_ZHHANS:
+                        TSL_R_TRY(plGetSharedFontByType(&localFontData, PlSharedFontType_ChineseSimplified));
+                        tsl::MainFrameButtonText = "\uE0E1  返回     \uE0E0  确认";
+                        break;
+                    case SetLanguage_KO:
+                        TSL_R_TRY(plGetSharedFontByType(&localFontData, PlSharedFontType_KO));
+                        tsl::MainFrameButtonText = "\uE0E1  뒤로     \uE0E0  확인";
+                        break;
+                    case SetLanguage_ZHTW:
+                    case SetLanguage_ZHHANT:
+                        TSL_R_TRY(plGetSharedFontByType(&localFontData, PlSharedFontType_ChineseTraditional));
+                        tsl::MainFrameButtonText = "\uE0E1  返回     \uE0E0  確認";
+                        break;
+                    default:
+                        this->m_hasLocalFont = false; 
+                        break;
+                    }
+
+                    if (this->m_hasLocalFont) {
+                        fontBuffer = reinterpret_cast<u8*>(localFontData.address);
+                        stbtt_InitFont(&this->m_localFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+                    }
+                }          
 
                 // Nintendo's extended font containing a bunch of icons
                 TSL_R_TRY(plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt));
 
                 fontBuffer = reinterpret_cast<u8*>(extFontData.address);
                 stbtt_InitFont(&this->m_extFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
-
-                if(R_SUCCEEDED(setInitialize())) {
-                    u64 languageCode;
-                    if (R_SUCCEEDED(setGetSystemLanguage(&languageCode))) {
-                        SetLanguage setLanguage;
-                        if (R_SUCCEEDED(setMakeLanguage(languageCode, &setLanguage))) {
-                            switch (setLanguage) {
-                            case SetLanguage_ZHCN:
-                            case SetLanguage_ZHHANS:
-                                if(R_SUCCEEDED(plGetSharedFontByType(&localFontData, PlSharedFontType_ChineseSimplified)))
-                                    this->m_MainFrameButtonText = "\uE0E1  返回     \uE0E0  确认";
-                                break;
-                            case SetLanguage_KO:
-                                if(R_SUCCEEDED(plGetSharedFontByType(&localFontData, PlSharedFontType_KO)))
-                                    this->m_MainFrameButtonText = "\uE0E1  뒤로     \uE0E0  확인";
-                                break;
-                            case SetLanguage_ZHTW:
-                            case SetLanguage_ZHHANT:
-                                if(R_SUCCEEDED(plGetSharedFontByType(&localFontData, PlSharedFontType_ChineseTraditional)))
-                                    this->m_MainFrameButtonText = "\uE0E1  返回     \uE0E0  確認";
-                                break;
-                            default:
-                                break;
-                            }
-                            if (this->m_hasLocalFont) {
-                                fontBuffer = reinterpret_cast<u8*>(localFontData.address);
-                                stbtt_InitFont(&this->m_localFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
-                            }
-                        }
-                    }
-                    setExit();
-                }
 
                 return 0;
             }
@@ -1607,7 +1602,7 @@ namespace tsl {
                 if (FullMode == true)
                     renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
                 if (TeslaFPS == 60)
-                    renderer->drawString(renderer->getMainFrameButtonText().c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
+                    renderer->drawString(tsl::MainFrameButtonText.c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
 
                 if (this->m_contentElement != nullptr)
                     this->m_contentElement->frame(renderer);
@@ -1701,7 +1696,7 @@ namespace tsl {
 
                 renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
 
-                renderer->drawString(renderer->getMainFrameButtonText().c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
+                renderer->drawString(tsl::MainFrameButtonText.c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
 
                 if (this->m_header != nullptr)
                     this->m_header->frame(renderer);
@@ -1830,7 +1825,7 @@ namespace tsl {
 
                     this->m_items.clear();
                     this->m_offset = 0;
-                    this->m_focusedIndex = 0; //####
+                    this->m_focusedIndex = 0; 
                     this->invalidate();
                     this->m_clearList = false;
                 }
@@ -3136,7 +3131,7 @@ namespace tsl {
             if (currentFocus == nullptr) {
                 if (keysDown & HidNpadButton_B) {
                     if (!currentGui->handleInput(HidNpadButton_B, 0,{},{},{}))
-                        this->goBack();//####
+                        this->goBack();
                     return;
                 }
 
@@ -3189,7 +3184,7 @@ namespace tsl {
                     repeatTick++;
                 } else {
                     if (keysDown & HidNpadButton_B)
-                        this->goBack();//####
+                        this->goBack();
                     repeatTick = 0;
                     shouldShake = true;
                 }
