@@ -1110,7 +1110,7 @@ namespace tsl {
                         fontBuffer = reinterpret_cast<u8*>(localFontData.address);
                         stbtt_InitFont(&this->m_localFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
                     }
-                }          
+                }
 
                 // Nintendo's extended font containing a bunch of icons
                 TSL_R_TRY(plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt));
