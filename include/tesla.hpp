@@ -70,6 +70,12 @@
         }                               \
     })
 
+#ifdef BUILD_STATUS_MONITOR_OVERLAY
+u8 TeslaFPS = 1;
+bool IsFrameBackground = true;
+bool FullMode = true;
+#endif
+
 using namespace std::literals::string_literals;
 using namespace std::literals::chrono_literals;
 
@@ -1137,6 +1143,9 @@ namespace tsl {
              * @warning Don't call this before calling \ref startFrame once
              */
             inline void endFrame() {
+#ifdef BUILD_STATUS_MONITOR_OVERLAY
+                svcSleepThread(1000*1000*1000 / TeslaFPS);
+#endif
                 this->waitForVSync();
                 framebufferEnd(&this->m_framebuffer);
 
@@ -1595,15 +1604,27 @@ namespace tsl {
             }
 
             virtual void draw(gfx::Renderer *renderer) override {
+#ifndef BUILD_STATUS_MONITOR_OVERLAY
                 renderer->fillScreen(a(tsl::style::color::ColorFrameBackground));
+#else                
+                renderer->fillScreen(a(IsFrameBackground ? tsl::style::color::ColorFrameBackground : tsl::style::color::ColorTransparent));
+#endif
+
                 renderer->drawRect(tsl::cfg::FramebufferWidth - 1, 0, 1, tsl::cfg::FramebufferHeight, a(0xF222));
 
                 renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
                 renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorDescription));
 
+#ifndef BUILD_STATUS_MONITOR_OVERLAY
                 renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
 
-                renderer->drawString(renderer->getMainFrameButtonText().c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
+                renderer->drawString(tsl::MainFrameButtonText.c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
+#else
+                if (FullMode == true)
+                    renderer->drawRect(15, tsl::cfg::FramebufferHeight - 73, tsl::cfg::FramebufferWidth - 30, 1, a(tsl::style::color::ColorText));
+                if (TeslaFPS == 60)
+                    renderer->drawString(tsl::MainFrameButtonText.c_str(), false, 30, 693, 23, a(tsl::style::color::ColorText));
+#endif
 
                 if (this->m_contentElement != nullptr)
                     this->m_contentElement->frame(renderer);
@@ -2948,7 +2969,11 @@ namespace tsl {
                 this->m_disableNextAnimation = false;
             }
             else {
+#ifndef BUILD_STATUS_MONITOR_OVERLAY
                 this->m_fadeInAnimationPlaying = true;
+#else
+                this->m_fadeInAnimationPlaying = false;
+#endif
                 this->m_animationCounter = 0;
             }
 
@@ -2968,7 +2993,11 @@ namespace tsl {
                 this->m_disableNextAnimation = false;
             }
             else {
+#ifndef BUILD_STATUS_MONITOR_OVERLAY
                 this->m_fadeOutAnimationPlaying = true;
+#else
+                this->m_fadeOutAnimationPlaying = false;
+#endif
                 this->m_animationCounter = 5;
             }
 
