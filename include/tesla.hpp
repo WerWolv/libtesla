@@ -869,14 +869,6 @@ namespace tsl {
                 return string;
             }
 
-            /**
-             * @brief Get the main frame button display string
-             *
-             * @return Main button display text
-             */
-            std::string getMainFrameButtonText() {
-                return this->m_MainFrameButtonText;
-            }
         private:
             Renderer() {}
 
@@ -905,7 +897,7 @@ namespace tsl {
             /**
              * @brief Main frame button text
              */
-            std::string m_MainFrameButtonText{"\uE0E1  返回     \uE0E0  确认"};
+            std::string m_MainFrameButtonText{"\uE0E1  Back     \uE0E0  OK"};
             bool m_initialized = false;
             ViDisplay m_display;
             ViLayer m_layer;
