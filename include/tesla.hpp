@@ -71,9 +71,9 @@
     })
 
 #ifdef BUILD_STATUS_MONITOR_OVERLAY
-u8 TeslaFPS = 1;
-bool FullMode = true;
+u8 TeslaFPS = 60;
 bool IsFrameBackground = true;
+bool FullMode = true;
 #endif
 
 using namespace std::literals::string_literals;
@@ -1612,7 +1612,7 @@ namespace tsl {
 #endif
 
                 renderer->drawString(this->m_title.c_str(), false, 20, 50, 30, a(tsl::style::color::ColorText));
-                renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorText));
+                renderer->drawString(this->m_subtitle.c_str(), false, 20, 70, 15, a(tsl::style::color::ColorDescription));
 
 #ifdef BUILD_STATUS_MONITOR_OVERLAY
                 if (FullMode == true)
@@ -3160,13 +3160,11 @@ namespace tsl {
             auto topElement = currentGui->getTopElement();
 
             if (currentFocus == nullptr) {
-#ifdef BUILD_STATUS_MONITOR_OVERLAY
                 if (keysDown & HidNpadButton_B) {
                     if (!currentGui->handleInput(HidNpadButton_B, 0,{},{},{}))
                         this->goBack();
                     return;
                 }
-#endif
 
                 if (topElement == nullptr)
                     return;
@@ -3491,7 +3489,7 @@ namespace tsl {
 
             // To prevent focus glitchout, close the overlay immediately when the home button gets pressed
             hidsysAcquireHomeButtonEventHandle(&shData->homeButtonPressEvent, false);
-#ifdef BUILD_STATUS_MONITOR_OVERLAY
+#ifndef BUILD_STATUS_MONITOR_OVERLAY
             eventClear(&shData->homeButtonPressEvent);
 #endif
 
@@ -3519,7 +3517,7 @@ namespace tsl {
 
             // To prevent focus glitchout, close the overlay immediately when the power button gets pressed
             hidsysAcquireSleepButtonEventHandle(&shData->powerButtonPressEvent, false);
-#ifdef BUILD_STATUS_MONITOR_OVERLAY
+#ifndef BUILD_STATUS_MONITOR_OVERLAY
             eventClear(&shData->powerButtonPressEvent);
 #endif
 
