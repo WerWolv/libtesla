@@ -3664,9 +3664,9 @@ extern "C" {
             ASSERT_FATAL(hidInitialize());                          // Controller inputs and Touch
             if (!hosversionAtLeast(16,0,0)) {
                 ASSERT_FATAL(plInitialize(PlServiceType_User));     // Font data. Use pl:u for 16.0.0+
-            }
-            else
+            } else {
                 ASSERT_FATAL(plInitialize(PlServiceType_System));   // Use pl:s for 15.0.1 and below to prevent qlaunch/overlaydisp session exhaustion 
+            }
             ASSERT_FATAL(pmdmntInitialize());                       // PID querying
             ASSERT_FATAL(hidsysInitialize());                       // Focus control
             ASSERT_FATAL(setsysInitialize());                       // Settings querying
