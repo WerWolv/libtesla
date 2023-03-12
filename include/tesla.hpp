@@ -1272,7 +1272,7 @@ namespace tsl {
              *
              * @param renderer
              */
-            virtual void frame(gfx::Renderer *renderer) final {
+            void frame(gfx::Renderer *renderer) {
                 renderer->enableScissoring(0, 0, tsl::cfg::FramebufferWidth, tsl::cfg::FramebufferHeight);
 
                 if (this->m_focused)
@@ -1294,7 +1294,7 @@ namespace tsl {
              * @brief Forces a layout recreation of a element
              *
              */
-            virtual void invalidate() final {
+            void invalidate() {
                 const auto& parent = this->getParent();
 
                 if (parent == nullptr)
@@ -1308,7 +1308,7 @@ namespace tsl {
              *
              * @param direction Direction to shake highlight in
              */
-            virtual void shakeHighlight(FocusDirection direction) final {
+            void shakeHighlight(FocusDirection direction) {
                 this->m_highlightShaking = true;
                 this->m_highlightShakingDirection = direction;
                 this->m_highlightShakingStartTime = std::chrono::system_clock::now();
@@ -1318,14 +1318,14 @@ namespace tsl {
              * @brief Triggers the blue click animation to signal a element has been clicked on
              *
              */
-            virtual void triggerClickAnimation() final {
+            void triggerClickAnimation() {
                 this->m_clickAnimationProgress = tsl::style::ListItemHighlightLength;
             }
 
             /**
              * @brief Resets the click animation progress, canceling the animation
              */
-            virtual void resetClickAnimation() final {
+            void resetClickAnimation() {
                 this->m_clickAnimationProgress = 0;
             }
 
@@ -1638,7 +1638,7 @@ namespace tsl {
              *
              * @param content Element
              */
-            virtual void setContent(Element *content) final {
+            void setContent(Element *content) {
                 if (this->m_contentElement != nullptr)
                     delete this->m_contentElement;
 
@@ -1655,7 +1655,7 @@ namespace tsl {
              *
              * @param title Title to change to
              */
-            virtual void setTitle(const std::string &title) final {
+            void setTitle(const std::string &title) {
                 this->m_title = title;
             }
 
@@ -1664,7 +1664,7 @@ namespace tsl {
              *
              * @param title Subtitle to change to
              */
-            virtual void setSubtitle(const std::string &subtitle) final {
+            void setSubtitle(const std::string &subtitle) {
                 this->m_subtitle = subtitle;
             }
 
@@ -1740,7 +1740,7 @@ namespace tsl {
              *
              * @param content Element
              */
-            virtual void setContent(Element *content) final {
+            void setContent(Element *content) {
                 if (this->m_contentElement != nullptr)
                     delete this->m_contentElement;
 
@@ -1757,7 +1757,7 @@ namespace tsl {
              *
              * @param header Header custom drawer
              */
-            virtual void setHeader(CustomDrawer *header) final {
+            void setHeader(CustomDrawer *header) {
                 if (this->m_header != nullptr)
                     delete this->m_header;
 
@@ -1941,7 +1941,7 @@ namespace tsl {
              * @param index Index in the list where the item should be inserted. -1 or greater list size will insert it at the end
              * @param height Height of the element. Don't set this parameter for libtesla to try and figure out the size based on the type
              */
-            virtual void addItem(Element *element, u16 height = 0, ssize_t index = -1) final {
+            void addItem(Element *element, u16 height = 0, ssize_t index = -1) {
                 if (element != nullptr) {
                     if (height != 0)
                         element->setBoundaries(this->getX(), this->getY(), this->getWidth(), height);
@@ -1978,7 +1978,7 @@ namespace tsl {
              * @brief Removes all children from the list later on
              * @warning When clearing a list, make sure none of the its children are focused. Call \ref Gui::removeFocus before.
              */
-            virtual void clear() final {
+            void clear() {
                 this->m_clearList = true;
             }
 
@@ -2784,7 +2784,7 @@ namespace tsl {
          *
          * @return Top level element
          */
-        virtual elm::Element* getTopElement() final {
+        elm::Element* getTopElement() {
             return this->m_topElement;
         }
 
@@ -2793,7 +2793,7 @@ namespace tsl {
          *
          * @return Focused element
          */
-        virtual elm::Element* getFocusedElement() final {
+        elm::Element* getFocusedElement() {
             return this->m_focusedElement;
         }
 
@@ -2804,7 +2804,7 @@ namespace tsl {
          * @param element Element to focus
          * @param direction Focus direction
          */
-        virtual void requestFocus(elm::Element *element, FocusDirection direction, bool shake = true) final {
+        void requestFocus(elm::Element *element, FocusDirection direction, bool shake = true) {
             elm::Element *oldFocus = this->m_focusedElement;
 
             if (element != nullptr) {
@@ -2827,7 +2827,7 @@ namespace tsl {
          *
          * @param element Element to remove focus from. Pass nullptr to remove the focus unconditionally
          */
-        virtual void removeFocus(elm::Element* element = nullptr) final {
+        void removeFocus(elm::Element* element = nullptr) {
             if (element == nullptr || element == this->m_focusedElement) {
                 if (this->m_focusedElement != nullptr) {
                     this->m_focusedElement->setFocused(false);
@@ -2836,7 +2836,7 @@ namespace tsl {
             }
         }
 
-        virtual void restoreFocus() final {
+        void restoreFocus() {
             this->m_initialFocusSet = false;
         }
 
@@ -2857,16 +2857,16 @@ namespace tsl {
          *
          * @param renderer
          */
-        virtual void draw(gfx::Renderer *renderer) final {
+        void draw(gfx::Renderer *renderer) {
             if (this->m_topElement != nullptr)
                 this->m_topElement->draw(renderer);
         }
 
-        virtual bool initialFocusSet() final {
+        bool initialFocusSet() {
             return this->m_initialFocusSet;
         }
 
-        virtual void markInitialFocusSet() final {
+        void markInitialFocusSet() {
             this->m_initialFocusSet = true;
         }
 
@@ -2932,7 +2932,7 @@ namespace tsl {
          *
          * @return Current Gui reference
          */
-        virtual std::unique_ptr<tsl::Gui>& getCurrentGui() final {
+        std::unique_ptr<tsl::Gui>& getCurrentGui() {
             return this->m_guiStack.top();
         }
 
@@ -2940,7 +2940,7 @@ namespace tsl {
          * @brief Shows the Gui
          *
          */
-        virtual void show() final {
+        void show() {
             if (this->m_disableNextAnimation) {
                 this->m_animationCounter = 5;
                 this->m_disableNextAnimation = false;
@@ -2960,7 +2960,7 @@ namespace tsl {
          * @brief Hides the Gui
          *
          */
-        virtual void hide() final {
+        void hide() {
             if (this->m_disableNextAnimation) {
                 this->m_animationCounter = 0;
                 this->m_disableNextAnimation = false;
@@ -2978,7 +2978,7 @@ namespace tsl {
          *
          * @return whether fade animation is playing
          */
-        virtual bool fadeAnimationPlaying() final {
+        bool fadeAnimationPlaying() {
             return this->m_fadeInAnimationPlaying || this->m_fadeOutAnimationPlaying;
         }
 
@@ -2987,7 +2987,7 @@ namespace tsl {
          * @note This makes the Tesla overlay exit and return back to the Tesla-Menu
          *
          */
-        virtual void close() final {
+        void close() {
             this->m_shouldClose = true;
         }
 
@@ -3032,7 +3032,7 @@ namespace tsl {
          * @brief Initializes the Renderer
          *
          */
-        virtual void initScreen() final {
+        void initScreen() {
             gfx::Renderer::get().init();
         }
 
@@ -3040,7 +3040,7 @@ namespace tsl {
          * @brief Exits the Renderer
          *
          */
-        virtual void exitScreen() final {
+        void exitScreen() {
             gfx::Renderer::get().exit();
         }
 
@@ -3049,7 +3049,7 @@ namespace tsl {
          *
          * @return should hide
          */
-        virtual bool shouldHide() final {
+        bool shouldHide() {
             return this->m_shouldHide;
         }
 
@@ -3058,7 +3058,7 @@ namespace tsl {
          *
          * @return should close
          */
-        virtual bool shouldClose() final {
+        bool shouldClose() {
             return this->m_shouldClose;
         }
 
@@ -3066,7 +3066,7 @@ namespace tsl {
          * @brief Handles fade in and fade out animations of the Overlay
          *
          */
-        virtual void animationLoop() final {
+        void animationLoop() {
             if (this->m_fadeInAnimationPlaying) {
                 this->m_animationCounter++;
 
@@ -3090,7 +3090,7 @@ namespace tsl {
          * @brief Main loop
          *
          */
-        virtual void loop() final {
+        void loop() {
             auto& renderer = gfx::Renderer::get();
 
             renderer.startFrame();
@@ -3112,7 +3112,7 @@ namespace tsl {
          * @param rightJoyStick Right joystick position
          * @return Weather or not the input has been consumed
          */
-        virtual void handleInput(u64 keysDown, u64 keysHeld, bool touchDetected, const HidTouchState &touchPos, HidAnalogStickState joyStickPosLeft, HidAnalogStickState joyStickPosRight) final {
+        void handleInput(u64 keysDown, u64 keysHeld, bool touchDetected, const HidTouchState &touchPos, HidAnalogStickState joyStickPosLeft, HidAnalogStickState joyStickPosRight) {
             static HidTouchState initialTouchPos = { 0 };
             static HidTouchState oldTouchPos = { 0 };
             static bool oldTouchDetected = false;
@@ -3251,7 +3251,7 @@ namespace tsl {
          * @brief Clears the screen
          *
          */
-        virtual void clearScreen() final {
+        void clearScreen() {
             auto& renderer = gfx::Renderer::get();
 
             renderer.startFrame();
@@ -3263,7 +3263,7 @@ namespace tsl {
          * @brief Reset hide and close flags that were previously set by \ref Overlay::close() or \ref Overlay::hide()
          *
          */
-        virtual void resetFlags() final {
+        void resetFlags() {
             this->m_shouldHide = false;
             this->m_shouldClose = false;
         }
@@ -3272,7 +3272,7 @@ namespace tsl {
          * @brief Disables the next animation that would play
          *
          */
-        virtual void disableNextAnimation() final {
+        void disableNextAnimation() {
             this->m_disableNextAnimation = true;
         }
 
