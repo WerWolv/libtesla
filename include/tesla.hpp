@@ -210,7 +210,8 @@ namespace tsl {
          *
          * @param f wrapped function
          */
-        static inline void doWithSmSession(std::function<void()> f) {
+        template<typename F>
+        static inline void doWithSmSession(F f) {
             smInitialize();
             f();
             smExit();
@@ -222,7 +223,8 @@ namespace tsl {
          *
          * @param f wrapped function
          */
-        static inline void doWithSDCardHandle(std::function<void()> f) {
+        template<typename F>
+        static inline void doWithSDCardHandle(F f) {
             fsdevMountSdmc();
             f();
             fsdevUnmountDevice("sdmc");
@@ -233,15 +235,17 @@ namespace tsl {
          *
          * @param f wrapped function
          */
+        template<typename F>
         class ScopeGuard {
             ScopeGuard(const ScopeGuard&) = delete;
             ScopeGuard& operator=(const ScopeGuard&) = delete;
             private:
-                std::function<void()> f;
+                F f;
+                bool canceled = false;
             public:
-                ALWAYS_INLINE ScopeGuard(std::function<void()> f) : f(std::move(f)) { }
-                ALWAYS_INLINE ~ScopeGuard() { if (f) { f(); } }
-                void dismiss() { f = nullptr; }
+                ALWAYS_INLINE ScopeGuard(F f) : f(std::move(f)) { }
+                ALWAYS_INLINE ~ScopeGuard() { if (!canceled) { f(); } }
+                void dismiss() { canceled = true; }
         };
 
         /**
