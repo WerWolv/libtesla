@@ -3344,7 +3344,7 @@ namespace tsl {
         struct SharedThreadData {
             bool running = false;
 
-            Event comboEvent = { 0 }, homeButtonPressEvent = { 0 }, powerButtonPressEvent = { 0 };
+            Event comboEvent = { 0 };
 
             bool overlayOpen = false;
 
@@ -3384,14 +3384,24 @@ namespace tsl {
         }
 
         /**
-         * @brief Input polling loop thread
+         * @brief Background event polling loop thread
          *
-         * @tparam launchFlags Launch flags
          * @param args Used to pass in a pointer to a \ref SharedThreadData struct
          */
-        template<impl::LaunchFlags launchFlags>
-        static void hidInputPoller(void *args) {
+        static void backgroundEventPoller(void *args) {
             SharedThreadData *shData = static_cast<SharedThreadData*>(args);
+
+            // To prevent focus glitchout, close the overlay immediately when the home button gets pressed
+            Event homeButtonPressEvent = {};
+            hidsysAcquireHomeButtonEventHandle(&homeButtonPressEvent, false);
+            eventClear(&homeButtonPressEvent);
+            hlp::ScopeGuard homeButtonEventGuard([&] { eventClose(&homeButtonPressEvent); });
+
+            // To prevent focus glitchout, close the overlay immediately when the power button gets pressed
+            Event powerButtonPressEvent = {};
+            hidsysAcquireSleepButtonEventHandle(&powerButtonPressEvent, false);
+            eventClear(&powerButtonPressEvent);
+            hlp::ScopeGuard powerButtonEventGuard([&] { eventClose(&powerButtonPressEvent); });
 
             // Parse Tesla settings
             impl::parseOverlaySettings();
@@ -3409,8 +3419,20 @@ namespace tsl {
             // Drop all inputs from the previous overlay
             padUpdate(&pad);
 
-            while (shData->running) {
+            enum WaiterObject {
+                WaiterObject_HomeButton,
+                WaiterObject_PowerButton,
 
+                WaiterObject_Count
+            };
+
+            // Construct waiter
+            Waiter objects[2] = {
+                [WaiterObject_HomeButton] = waiterForEvent(&homeButtonPressEvent),
+                [WaiterObject_PowerButton] = waiterForEvent(&powerButtonPressEvent),
+            };
+
+            while (shData->running) {
                 // Scan for input changes
                 padUpdate(&pad);
 
@@ -3440,60 +3462,26 @@ namespace tsl {
                 }
 
                 //20 ms
-                svcSleepThread(20'000'000ul);
-            }
-        }
-
-        /**
-         * @brief Home button detection loop thread
-         * @note This makes sure that focus cannot glitch out when pressing the home button
-         *
-         * @param args Used to pass in a pointer to a \ref SharedThreadData struct
-         */
-        static void homeButtonDetector(void *args) {
-            SharedThreadData *shData = static_cast<SharedThreadData*>(args);
-
-            // To prevent focus glitchout, close the overlay immediately when the home button gets pressed
-            hidsysAcquireHomeButtonEventHandle(&shData->homeButtonPressEvent, false);
-            eventClear(&shData->homeButtonPressEvent);
-
-            while (shData->running) {
-                if (R_SUCCEEDED(eventWait(&shData->homeButtonPressEvent, 100'000'000))) {
-                    eventClear(&shData->homeButtonPressEvent);
-
+                s32 idx = 0;
+                Result rc = waitObjects(&idx, objects, WaiterObject_Count, 20'000'000ul);
+                if (R_SUCCEEDED(rc)) {
                     if (shData->overlayOpen) {
                         tsl::Overlay::get()->hide();
                         shData->overlayOpen = false;
                     }
-                }
-            }
 
-        }
-
-        /**
-         * @brief Power button detection loop thread
-         * @note This makes sure that focus cannot glitch out when pressing the power button
-         *
-         * @param args Used to pass in a pointer to a \ref SharedThreadData struct
-         */
-        static void powerButtonDetector(void *args) {
-            SharedThreadData *shData = static_cast<SharedThreadData*>(args);
-
-            // To prevent focus glitchout, close the overlay immediately when the power button gets pressed
-            hidsysAcquireSleepButtonEventHandle(&shData->powerButtonPressEvent, false);
-            eventClear(&shData->powerButtonPressEvent);
-
-            while (shData->running) {
-                if (R_SUCCEEDED(eventWait(&shData->powerButtonPressEvent, 100'000'000))) {
-                    eventClear(&shData->powerButtonPressEvent);
-
-                    if (shData->overlayOpen) {
-                        tsl::Overlay::get()->hide();
-                        shData->overlayOpen = false;
+                    switch (idx) {
+                        case WaiterObject_HomeButton:
+                            eventClear(&homeButtonPressEvent);
+                            break;
+                        case WaiterObject_PowerButton:
+                            eventClear(&powerButtonPressEvent);
+                            break;
                     }
+                } else if (rc != KERNELRESULT(TimedOut)) {
+                    ASSERT_FATAL(rc);
                 }
             }
-
         }
 
     }
@@ -3546,17 +3534,11 @@ namespace tsl {
 
         shData.running = true;
 
-        Thread hidPollerThread, homeButtonDetectorThread, powerButtonDetectorThread;
-        threadCreate(&hidPollerThread, impl::hidInputPoller<launchFlags>, &shData, nullptr, 0x1000, 0x10, -2);
-        threadCreate(&homeButtonDetectorThread, impl::homeButtonDetector, &shData, nullptr, 0x1000, 0x2C, -2);
-        threadCreate(&powerButtonDetectorThread, impl::powerButtonDetector, &shData, nullptr, 0x1000, 0x2C, -2);
-        threadStart(&hidPollerThread);
-        threadStart(&homeButtonDetectorThread);
-        threadStart(&powerButtonDetectorThread);
+        Thread backgroundThread;
+        threadCreate(&backgroundThread, impl::backgroundEventPoller, &shData, nullptr, 0x1000, 0x2c, -2);
+        threadStart(&backgroundThread);
 
         eventCreate(&shData.comboEvent, false);
-
-
 
         auto& overlay = tsl::Overlay::s_overlayInstance;
         overlay = new TOverlay();
@@ -3616,16 +3598,10 @@ namespace tsl {
             eventClear(&shData.comboEvent);
         }
 
-        eventClose(&shData.homeButtonPressEvent);
-        eventClose(&shData.powerButtonPressEvent);
         eventClose(&shData.comboEvent);
 
-        threadWaitForExit(&hidPollerThread);
-        threadClose(&hidPollerThread);
-        threadWaitForExit(&homeButtonDetectorThread);
-        threadClose(&homeButtonDetectorThread);
-        threadWaitForExit(&powerButtonDetectorThread);
-        threadClose(&powerButtonDetectorThread);
+        threadWaitForExit(&backgroundThread);
+        threadClose(&backgroundThread);
 
         overlay->exitScreen();
         overlay->exitServices();
