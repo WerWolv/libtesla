@@ -534,26 +534,14 @@ namespace tsl {
              * @param h Height
              */
             inline void enableScissoring(s32 x, s32 y, s32 w, s32 h) {
-                if (this->m_scissoring)
-                    this->m_scissoringStack.push_back(this->m_currScissorConfig);
-                else
-                    this->m_scissoring = true;
-
-                this->m_currScissorConfig = { x, y, w, h };
+                this->m_scissoringStack.emplace(x, y, w, h);
             }
 
             /**
              * @brief Disables scissoring
              */
             inline void disableScissoring() {
-                if (this->m_scissoringStack.size() > 0) {
-                    this->m_currScissorConfig = this->m_scissoringStack.back();
-                    this->m_scissoringStack.pop_back();
-                }
-                else {
-                    this->m_scissoring = false;
-                    this->m_currScissorConfig = { 0 };
-                }
+                this->m_scissoringStack.pop();
             }
 
 
@@ -940,9 +928,7 @@ namespace tsl {
             Framebuffer m_framebuffer;
             void *m_currentFramebuffer = nullptr;
 
-            bool m_scissoring = false;
-            ScissoringConfig m_currScissorConfig;
-            std::vector<ScissoringConfig> m_scissoringStack;
+            std::stack<ScissoringConfig> m_scissoringStack;
 
             stbtt_fontinfo m_stdFont, m_localFont, m_extFont;
             bool m_hasLocalFont = false;
@@ -1019,11 +1005,12 @@ namespace tsl {
              * @return Offset
              */
             u32 getPixelOffset(s32 x, s32 y) {
-                if (this->m_scissoring) {
-                    if (x < this->m_currScissorConfig.x ||
-                        y < this->m_currScissorConfig.y ||
-                        x > this->m_currScissorConfig.x + this->m_currScissorConfig.w ||
-                        y > this->m_currScissorConfig.y + this->m_currScissorConfig.h)
+                if (!this->m_scissoringStack.empty()) {
+                    auto currScissorConfig = this->m_scissoringStack.top();
+                    if (x < currScissorConfig.x ||
+                        y < currScissorConfig.y ||
+                        x > currScissorConfig.x + currScissorConfig.w ||
+                        y > currScissorConfig.y + currScissorConfig.h)
                             return UINT32_MAX;
                 }
 
