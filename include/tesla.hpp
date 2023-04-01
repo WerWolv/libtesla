@@ -1079,7 +1079,25 @@ namespace tsl {
                 if (!this->m_initialized)
                     return;
 
-                framebufferClose(&this->m_framebuffer);
+                //framebufferClose(&this->m_framebuffer);
+                Framebuffer* fb = &this->m_framebuffer;
+                if (!fb || !fb->has_init)
+                    return;
+
+                if (fb->buf_linear)
+                    free(fb->buf_linear);
+
+                if (fb->buf) {
+                    nwindowReleaseBuffers(fb->win);
+                    nvMapClose(&fb->map);
+                    free(fb->buf);
+                }
+
+                memset(fb, 0, sizeof(*fb));
+                nvFenceExit();
+                nvMapExit();
+                svcSleepThread(10'000'000);
+                nvExit();
                 nwindowClose(&this->m_window);
                 viDestroyManagedLayer(&this->m_layer);
                 viCloseDisplay(&this->m_display);
