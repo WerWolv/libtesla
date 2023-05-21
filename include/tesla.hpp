@@ -1106,7 +1106,7 @@ namespace tsl {
                     // Check if need localization font
                     SetLanguage setLanguage;
                     TSL_R_TRY(setMakeLanguage(languageCode, &setLanguage));
-                    this->m_hasLocalFont = true; 
+                    this->m_hasLocalFont = true;
                     switch (setLanguage) {
                     case SetLanguage_ZHCN:
                     case SetLanguage_ZHHANS:
@@ -1120,7 +1120,7 @@ namespace tsl {
                         TSL_R_TRY(plGetSharedFontByType(&localFontData, PlSharedFontType_ChineseTraditional));
                         break;
                     default:
-                        this->m_hasLocalFont = false; 
+                        this->m_hasLocalFont = false;
                         break;
                     }
 
@@ -1128,7 +1128,7 @@ namespace tsl {
                         fontBuffer = reinterpret_cast<u8*>(localFontData.address);
                         stbtt_InitFont(&this->m_localFont, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
                     }
-                }                
+                }
 
                 // Nintendo's extended font containing a bunch of icons
                 TSL_R_TRY(plGetSharedFontByType(&extFontData, PlSharedFontType_NintendoExt));
@@ -2997,7 +2997,7 @@ namespace tsl {
          */
         template<typename T, typename ... Args>
         constexpr inline std::unique_ptr<T> initially(Args&&... args) {
-            return std::move(std::make_unique<T>(args...));
+            return std::make_unique<T>(args...);
         }
 
     private:
@@ -3399,7 +3399,7 @@ namespace tsl {
             // Initialize pad
             PadState pad;
             padInitializeAny(&pad);
-            
+
             // Initialize touch screen
             hidInitializeTouchScreen();
 
@@ -3632,7 +3632,7 @@ extern "C" {
             if (hosversionAtLeast(16,0,0)) {
                 ASSERT_FATAL(plInitialize(PlServiceType_User));     // Font data. Use pl:u for 16.0.0+
             } else {
-                ASSERT_FATAL(plInitialize(PlServiceType_System));   // Use pl:s for 15.0.1 and below to prevent qlaunch/overlaydisp session exhaustion 
+                ASSERT_FATAL(plInitialize(PlServiceType_System));   // Use pl:s for 15.0.1 and below to prevent qlaunch/overlaydisp session exhaustion
             }
             ASSERT_FATAL(pmdmntInitialize());                       // PID querying
             ASSERT_FATAL(hidsysInitialize());                       // Focus control
