@@ -37,7 +37,7 @@
 #include <list>
 #include <stack>
 #include <map>
-
+#include <filesystem>
 
 // Define this makro before including tesla.hpp in your main file. If you intend
 // to use the tesla.hpp header in more than one source file, only define it once!
@@ -3494,9 +3494,10 @@ namespace tsl {
         Overlay::get()->goBack();
     }
 
-    static void setNextOverlay(const std::string& ovlPath, std::string args) {
+    static void setNextOverlay(const std::string& ovlPath, std::string origArgs) {
 
-        args += " --skipCombo";
+        std::string args = std::filesystem::path(ovlPath).filename();
+        args += " " + origArgs + " --skipCombo";
 
         envSetNextLoad(ovlPath.c_str(), args.c_str());
     }
