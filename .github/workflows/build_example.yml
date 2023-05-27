@@ -1,0 +1,14 @@
+name: build
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+
+    steps:
+    - name: Checkout 🛎️
+      uses: actions/checkout@master
+
+    - name: Build
+      run: cd example && make -j2
